@@ -1,23 +1,26 @@
 {
-  "appId": "com.webora.pos",
-  "appName": "WeB Ora POS",
-  "webDir": "2-Android-APK-Build",
-  "server": {
-    "androidScheme": "https",
-    "allowNavigation": ["*.supabase.co", "*.googleapis.com"]
-  },
-  "android": {
-    "allowMixedContent": true,
-    "webContentsDebuggingEnabled": false
-  },
-  "plugins": {
-    "SplashScreen": {
-      "launchShowDuration": 2000,
-      "backgroundColor": "#0f172a",
-      "androidSplashResourceName": "splash",
-      "showSpinner": false,
-      "splashFullScreen": true,
-      "splashImmersive": true
-    }
-  }
+    "appId":  "com.webora.pos",
+    "appName":  "WeB Ora POS",
+    "webDir":  "2-Android-APK-Build",
+    "server":  {
+                   "androidScheme":  "https",
+                   "allowNavigation":  [
+                                           "*.supabase.co",
+                                           "*.googleapis.com"
+                                       ]
+               },
+    "android":  {
+                    "allowMixedContent":  true,
+                    "webContentsDebuggingEnabled":  false
+                },
+    "plugins":  {
+                    "SplashScreen":  {
+                                         "launchShowDuration":  2000,
+                                         "backgroundColor":  "#0f172a",
+                                         "androidSplashResourceName":  "splash",
+                                         "showSpinner":  false,
+                                         "splashFullScreen":  true,
+                                         "splashImmersive":  true
+                                     }
+                }
 }
