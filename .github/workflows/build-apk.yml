@@ -1,4 +1,4 @@
-﻿name: Build Android APK
+name: Build Android APK
 
 on:
   push:
@@ -38,7 +38,7 @@ jobs:
     - name: Sync and Build APK
       run: |
         npx cap sync android
-        npx cap build android
+        npx cap build android --mode debug
 
     - name: Upload APK
       uses: actions/upload-artifact@v4
