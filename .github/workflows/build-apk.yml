@@ -29,17 +29,16 @@ jobs:
     - name: Install dependencies
       run: npm install
 
-    - name: Build web assets
-      run: npm run build || echo "No build script"
+    - name: Build web app
+      run: npm run build || echo "No build script, skipping"
 
     - name: Add Android platform
       run: npx cap add android || true
 
-    - name: Sync and build APK (debug)
+    - name: Sync and Build Debug APK
       run: |
         npx cap sync android
-        npx cap build android
-
+        npx cap build android --mode debug
     - name: Upload APK
       uses: actions/upload-artifact@v4
       with:
