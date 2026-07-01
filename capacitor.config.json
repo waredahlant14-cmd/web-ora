@@ -8,10 +8,7 @@
   },
   "android": {
     "allowMixedContent": true,
-    "captureInput": true,
-    "webContentsDebuggingEnabled": false,
-    "loggingBehavior": "none",
-    "minWebViewVersion": 60
+    "webContentsDebuggingEnabled": false
   },
   "plugins": {
     "SplashScreen": {

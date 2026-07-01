@@ -1,0 +1,71 @@
+name: Build Android APK
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+    inputs:
+      build_type:
+        description: 'نوع البناء'
+        required: true
+        default: 'debug'
+        type: choice
+        options:
+          - debug
+          - release
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: 18
+    
+    - name: Setup Java
+      uses: actions/setup-java@v4
+      with:
+        distribution: 'zulu'
+        java-version: '17'
+    
+    - name: Setup Android SDK
+      uses: android-actions/setup-android@v3
+    
+    - name: Install dependencies
+      run: npm install
+    
+    - name: Build Android
+      run: npx cap add android || true
+      continue-on-error: true
+    
+    - name: Build APK
+      run: npx cap sync android && npx cap build android --configuration ${{ github.event.inputs.build_type || 'debug' }}
+    
+    - name: Find APK
+      id: find_apk
+      run: |
+        APK_PATH=$(find . -name "*.apk" | head -n 1)
+        echo "APK_PATH=$APK_PATH" >> $GITHUB_OUTPUT
+        echo "APK_NAME=$(basename $APK_PATH)" >> $GITHUB_OUTPUT
+    
+    - name: Upload APK
+      uses: actions/upload-artifact@v4
+      with:
+        name: WeB-Ora-POS-v5.2.5
+        path: ${{ steps.find_apk.outputs.APK_PATH }}
+    
+    - name: Send to Telegram
+      uses: appleboy/telegram-action@master
+      with:
+        to: ${{ secrets.TELEGRAM_CHAT_ID }}
+        token: ${{ secrets.TELEGRAM_TOKEN }}
+        message: |
+          ✅ تم بناء APK بنجاح!
+          📱 التطبيق: WeB Ora POS v5.2.5
+          📦 نوع البناء: ${{ github.event.inputs.build_type || 'debug' }}
+          📂 اسم الملف: ${{ steps.find_apk.outputs.APK_NAME }}
+        document: ${{ steps.find_apk.outputs.APK_PATH }}
