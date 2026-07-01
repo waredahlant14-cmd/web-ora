@@ -1,4 +1,4 @@
-name: Build Android APK
+﻿name: Build Android APK
 
 on:
   push:
@@ -29,16 +29,16 @@ jobs:
     - name: Install dependencies
       run: npm install
 
-    - name: Build web app
-      run: npm run build || echo "No build script, skipping"
+    - name: Build web assets
+      run: npm run build || echo "No build script"
 
     - name: Add Android platform
       run: npx cap add android || true
 
-    - name: Sync and Build APK
+    - name: Sync and build APK (debug)
       run: |
         npx cap sync android
-        npx cap build android --mode debug
+        npx cap build android
 
     - name: Upload APK
       uses: actions/upload-artifact@v4
