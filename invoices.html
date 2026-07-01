@@ -1,0 +1,259 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>سجل الفواتير — WeB Ora</title>
+  <link rel="icon" type="image/png" href="img/mark.png">
+  <link rel="stylesheet" href="css/style.css">
+  <script src="config.js"></script>
+  <script src="js/mode-manager.js"></script>
+  <script src="js/supabase.min.js"></script>
+  <script src="js/auth.js"></script>
+  <script src="js/seclog.js"></script>
+  <script src="js/currency.js"></script>
+  <script src="js/db.js"></script>
+  <script src="js/sync_queue.js"></script>
+  <script src="js/notifications.js"></script>
+  <script src="js/initial_sync.js"></script>
+  <script src="js/sync_replay.js"></script>
+    <script src="js/background_sync.js"></script>
+  <script src="js/python_sync_bridge.js"></script>
+  <script src="js/queue.js"></script>
+  <script src="js/online.js"></script>
+  <script src="js/layout.js"></script>
+  <script src="js/nav-extend.js"></script>
+  <script src="js/print.js"></script>
+  <script src="js/jsbarcode.min.js"></script>
+  <script src="js/silent-print.js"></script>
+  <script src="js/export.js"></script>
+  <script src="js/refresh-btn.js"></script>
+</head>
+<body>
+<div id="page">
+  <div class="page-head-row">
+    <div>
+      <h1>سجل الفواتير</h1>
+      <p>كل الفواتير المحفوظة</p>
+    </div>
+    <div class="btn-group">
+      <button class="btn btn-outline" onclick="doExportExcel()">
+        <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+        تصدير Excel
+      </button>
+      <a class="btn btn-primary" href="new-invoice.html">
+        <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        فاتورة جديدة
+      </a>
+    </div>
+  </div>
+
+  <div class="search-row">
+    <input class="input" id="search" placeholder="بحث برقم الفاتورة أو اسم/جوال العميل" oninput="render()">
+    <select class="input" id="filter-status" onchange="render()">
+      <option value="">كل الحالات</option>
+      <option value="مدفوع">مدفوع</option>
+      <option value="آجل">آجل</option>
+    </select>
+    <select class="input" id="filter-month" onchange="render()">
+      <option value="">كل الأوقات</option>
+    </select>
+  </div>
+
+  <div id="list"></div>
+  <div class="empty-state" id="empty" style="display:none">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/></svg>
+    لا توجد فواتير مطابقة
+  </div>
+</div>
+
+<!-- نافذة التعديل -->
+<div class="modal-overlay" id="edit-modal">
+  <div class="modal" style="max-width:600px">
+    <h3>
+      <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+      تعديل الفاتورة
+    </h3>
+    <input type="hidden" id="edit-inv-num">
+    <div class="form-row">
+      <div class="field">
+        <label>حالة الدفع</label>
+        <select class="input" id="edit-status">
+          <option value="مدفوع">مدفوع</option>
+          <option value="آجل">آجل</option>
+        </select>
+      </div>
+      <div class="field"><label>الملاحظات</label><input class="input" id="edit-notes"></div>
+    </div>
+    <div class="field"><label>اسم العميل</label><input class="input" id="edit-cust-name"></div>
+    <div class="field"><label>جوال العميل</label><input class="input" id="edit-cust-phone"></div>
+    <div id="edit-items-list" style="margin-top:8px"></div>
+    <div class="modal-actions">
+      <button class="btn btn-primary" onclick="saveEdit()">حفظ التعديلات</button>
+      <button class="btn btn-outline" onclick="closeModal('edit-modal')">إلغاء</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  renderLayout("invoices");
+
+  var INVOICES = [];
+  var _FILTERED = [];
+
+  async function load() {
+    INVOICES = await getInvoices();
+    buildMonthFilter();
+    render();
+  }
+
+  function buildMonthFilter() {
+    var months = {};
+    INVOICES.forEach(function (inv) {
+      var m = (inv.date || "").slice(0, 7);
+      if (m) months[m] = true;
+    });
+    var sel = document.getElementById("filter-month");
+    var keys = Object.keys(months).sort().reverse();
+    keys.forEach(function (m) {
+      var opt = document.createElement("option");
+      opt.value = m;
+      opt.textContent = new Date(m + "-01").toLocaleDateString("ar", { year: "numeric", month: "long" });
+      sel.appendChild(opt);
+    });
+  }
+
+  function render() {
+    var q  = document.getElementById("search").value.trim().toLowerCase();
+    var st = document.getElementById("filter-status").value;
+    var mo = document.getElementById("filter-month").value;
+
+    _FILTERED = INVOICES.filter(function (inv) {
+      if (st && inv.paymentStatus !== st) return false;
+      if (mo && (inv.date || "").slice(0, 7) !== mo) return false;
+      if (!q) return true;
+      var hay = (inv.invoiceNumber + " " +
+        (inv.customer ? (inv.customer.name || "") + " " + (inv.customer.phone || "") : "")).toLowerCase();
+      return hay.indexOf(q) !== -1;
+    });
+
+    var html = "";
+    _FILTERED.forEach(function (inv, idx) {
+      var paid = inv.paymentStatus === "مدفوع";
+      var itemsRows = "";
+      (inv.items || []).forEach(function (it) {
+        itemsRows += "<tr><td>" + esc(it.name) + "</td><td>" + it.quantity +
+          "</td><td>" + formatPrice(it.price) + "</td><td class='fw-bold'>" + formatPrice(it.total) + "</td></tr>";
+      });
+
+      html += '<div class="card">' +
+        '<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;cursor:pointer" onclick="toggle(' + idx + ')">' +
+        '<div><div class="fw-bold direction-ltr">' + esc(inv.invoiceNumber) + '</div>' +
+        '<div class="text-muted" style="font-size:12px">' + fmtDate(inv.date) +
+        (inv.customer ? ' · ' + esc(inv.customer.name || inv.customer.phone) : '') + '</div></div>' +
+        '<div style="display:flex;align-items:center;gap:10px">' +
+        '<span class="badge ' + (paid ? "badge-green" : "badge-red") + '">' + esc(inv.paymentStatus) + '</span>' +
+        '<span class="fw-bold">' + formatPrice(inv.total) + '</span>' +
+        '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" id="arrow-' + idx + '" style="transition:.2s;color:var(--text-muted)"><polyline points="6 9 12 15 18 9"/></svg>' +
+        '</div></div>' +
+        '<div id="det-' + idx + '" style="display:none;margin-top:14px;border-top:1px solid var(--border);padding-top:14px">' +
+        '<div class="table-wrap"><table class="table"><thead><tr><th>المنتج</th><th>الكمية</th><th>السعر</th><th>الإجمالي</th></tr></thead><tbody>' +
+        itemsRows + '</tbody></table></div>' +
+        (inv.notes ? '<p class="text-muted" style="font-size:13px;margin-top:8px">ملاحظات: ' + esc(inv.notes) + '</p>' : '') +
+        '<div class="btn-group" style="margin-top:12px">' +
+        '<button class="btn btn-outline btn-sm" onclick="doPrint(' + idx + ')">' +
+        '<svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>' +
+        'طباعة</button>' +
+        '<button class="btn btn-blue btn-sm" onclick="doImg(' + idx + ')">' +
+        '<svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>' +
+        'تصدير صورة</button>' +
+        '<button class="btn btn-outline btn-sm" onclick="openEdit(' + idx + ')">' +
+        '<svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>' +
+        'تعديل</button>' +
+        (!paid ? '<button class="btn btn-green btn-sm" onclick="markPaid(' + idx + ')">' +
+        '<svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>' +
+        'تحويل لمدفوع</button>' : '') +
+        '<button class="btn btn-danger btn-sm" onclick="removeInv(' + idx + ')">' +
+        '<svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/></svg>' +
+        'حذف</button>' +
+        '</div></div></div>';
+    });
+
+    document.getElementById("list").innerHTML = html;
+    document.getElementById("empty").style.display = _FILTERED.length ? "none" : "block";
+  }
+
+  function toggle(idx) {
+    var el = document.getElementById("det-" + idx);
+    var arr = document.getElementById("arrow-" + idx);
+    var open = el.style.display !== "none";
+    el.style.display = open ? "none" : "block";
+    arr.style.transform = open ? "" : "rotate(180deg)";
+  }
+
+  function doPrint(idx) { printInvoice(_FILTERED[idx]); }
+  function doImg(idx)   { exportInvoiceAsImage(_FILTERED[idx]); }
+
+  async function markPaid(idx) {
+    await updateInvoiceStatus(_FILTERED[idx].invoiceNumber, "مدفوع");
+    toast("تم تحويل الفاتورة إلى مدفوع", "success");
+    load();
+  }
+
+  async function removeInv(idx) {
+    var inv = _FILTERED[idx];
+    if (!confirm("حذف الفاتورة " + inv.invoiceNumber + "؟ ستُعاد الكميات للمخزون.")) return;
+    await deleteInvoice(inv.invoiceNumber, inv.items);
+    toast("تم حذف الفاتورة", "success");
+    load();
+  }
+
+  var _editIdx = -1;
+  function openEdit(idx) {
+    _editIdx = idx;
+    var inv = _FILTERED[idx];
+    document.getElementById("edit-inv-num").value = inv.invoiceNumber;
+    document.getElementById("edit-status").value  = inv.paymentStatus;
+    document.getElementById("edit-notes").value   = inv.notes || "";
+    document.getElementById("edit-cust-name").value  = inv.customer ? (inv.customer.name  || "") : "";
+    document.getElementById("edit-cust-phone").value = inv.customer ? (inv.customer.phone || "") : "";
+
+    var itemsHtml = '<div style="font-size:12px;font-weight:700;color:var(--text-muted);margin-bottom:6px">تعديل أسعار العناصر</div>';
+    (inv.items || []).forEach(function (it, i) {
+      itemsHtml += '<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">' +
+        '<span style="flex:1;font-size:13px">' + esc(it.name) + ' × ' + it.quantity + '</span>' +
+        '<input type="number" class="input" style="width:100px;padding:5px 8px;font-size:12px" id="ei-price-' + i + '" value="' + it.price + '" step="0.01" min="0">' +
+        '<span style="font-size:11px;color:var(--text-muted)">USD/وحدة</span>' +
+        '</div>';
+    });
+    document.getElementById("edit-items-list").innerHTML = itemsHtml;
+    openModal("edit-modal");
+  }
+
+  async function saveEdit() {
+    var inv = _FILTERED[_editIdx];
+    var newItems = (inv.items || []).map(function (it, i) {
+      var price = parseFloat(document.getElementById("ei-price-" + i).value) || it.price;
+      return Object.assign({}, it, { price: price, total: it.quantity * price });
+    });
+    var newTotal = newItems.reduce(function (s, it) { return s + it.total; }, 0);
+    var phone = document.getElementById("edit-cust-phone").value.trim();
+    await updateInvoice(inv.invoiceNumber, {
+      paymentStatus: document.getElementById("edit-status").value,
+      notes: document.getElementById("edit-notes").value,
+      total: newTotal,
+      items: newItems,
+      customer: phone ? { phone: phone, name: document.getElementById("edit-cust-name").value.trim() } : null,
+    });
+    toast("تم حفظ التعديلات", "success");
+    closeModal("edit-modal");
+    load();
+  }
+
+  async function doExportExcel() { await exportInvoicesExcel(INVOICES); }
+
+  load();
+</script>
+    <script src="js/auto-updater-ui.js"></script>
+</body>
+</html>

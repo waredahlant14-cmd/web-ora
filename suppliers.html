@@ -1,0 +1,251 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>الموردون — WeB Ora</title>
+  <link rel="icon" type="image/png" href="img/mark-glow.png">
+  <link rel="stylesheet" href="css/style.css">
+  <script src="config.js"></script>
+  <script src="js/mode-manager.js"></script>
+  <script src="js/supabase.min.js"></script>
+  <script src="js/auth.js"></script>
+  <script src="js/seclog.js"></script>
+  <script src="js/currency.js"></script>
+  <script src="js/db.js"></script>
+  <script src="js/sync_queue.js"></script>
+  <script src="js/notifications.js"></script>
+  <script src="js/initial_sync.js"></script>
+  <script src="js/sync_replay.js"></script>
+    <script src="js/background_sync.js"></script>
+  <script src="js/queue.js"></script>
+  <script src="js/online.js"></script>
+  <script src="js/layout.js"></script>
+  <script src="js/nav-extend.js"></script>
+  <script src="js/suppliers.js"></script>
+  <script src="js/refresh-btn.js"></script>
+</head>
+<body>
+<div id="page">
+  <div class="page-head">
+    <h1>الموردون</h1>
+    <p>إدارة الموردين وفواتير الشراء وكشف الحسابات</p>
+  </div>
+
+  <div class="card">
+    <div class="flex-between" style="margin-bottom:16px">
+      <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+        <h2 style="margin:0">قائمة الموردين</h2>
+        <input class="input" id="search" placeholder="بحث..." style="width:200px;height:36px" oninput="renderList()">
+      </div>
+      <button class="btn btn-primary" onclick="openAddModal()">
+        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        مورد جديد
+      </button>
+    </div>
+
+    <!-- إحصائيات سريعة -->
+    <div class="stats-grid" style="margin-bottom:20px" id="sup-stats" style="display:none"></div>
+
+    <div class="table-wrap">
+      <table class="table">
+        <thead>
+          <tr>
+            <th>اسم المورد</th>
+            <th>الهاتف</th>
+            <th>العنوان</th>
+            <th>الرصيد المستحق</th>
+            <th>إجراءات</th>
+          </tr>
+        </thead>
+        <tbody id="sup-body"></tbody>
+      </table>
+    </div>
+    <div class="empty-state" id="sup-empty" style="display:none">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="1" y="3" width="15" height="13"/><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>
+      لا يوجد موردون بعد — أضف أول مورد
+    </div>
+  </div>
+</div>
+
+<!-- Modal إضافة/تعديل مورد -->
+<div class="modal" id="sup-modal">
+  <div class="modal-box" style="max-width:480px">
+    <div class="modal-head">
+      <h3 id="modal-title">مورد جديد</h3>
+      <button class="modal-close" onclick="closeModal('sup-modal')">✕</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="edit-id">
+      <div class="field"><label class="label">اسم المورد *</label>
+        <input class="input" id="f-name" placeholder="اسم الشركة أو المورد"></div>
+      <div class="field"><label class="label">رقم الهاتف</label>
+        <input class="input" id="f-phone" placeholder="+966..." type="tel"></div>
+      <div class="field"><label class="label">العنوان</label>
+        <input class="input" id="f-address" placeholder="المدينة، الشارع..."></div>
+      <div class="field"><label class="label">البريد الإلكتروني</label>
+        <input class="input" id="f-email" placeholder="supplier@email.com" type="email"></div>
+      <div class="field"><label class="label">ملاحظات</label>
+        <textarea class="input" id="f-notes" rows="2" placeholder="أي ملاحظات..."></textarea></div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-outline" onclick="closeModal('sup-modal')">إلغاء</button>
+      <button class="btn btn-primary" onclick="saveSupplier()">حفظ المورد</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal دفعة -->
+<div class="modal" id="pay-modal">
+  <div class="modal-box" style="max-width:380px">
+    <div class="modal-head">
+      <h3>تسجيل دفعة للمورد</h3>
+      <button class="modal-close" onclick="closeModal('pay-modal')">✕</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="pay-sup-id">
+      <p class="text-muted" style="font-size:13px;margin-bottom:12px">المورد: <strong id="pay-sup-name"></strong></p>
+      <div class="field"><label class="label">المبلغ المدفوع *</label>
+        <input class="input" id="pay-amount" type="number" min="0.01" step="0.01" placeholder="0.00"></div>
+      <div class="field"><label class="label">التاريخ</label>
+        <input class="input" id="pay-date" type="date"></div>
+      <div class="field"><label class="label">ملاحظات</label>
+        <input class="input" id="pay-notes" placeholder="اختياري"></div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-outline" onclick="closeModal('pay-modal')">إلغاء</button>
+      <button class="btn btn-primary" onclick="confirmPayment()">تأكيد الدفعة</button>
+    </div>
+  </div>
+</div>
+
+<script>
+renderLayout("suppliers");
+
+var _suppliers = [];
+
+async function load() {
+  _suppliers = await getSuppliers();
+  renderStats();
+  renderList();
+}
+
+function renderStats() {
+  var totalBalance = _suppliers.reduce(function(a,s){return a+s.balance;},0);
+  var withBalance  = _suppliers.filter(function(s){return s.balance>0;}).length;
+  var statsEl = document.getElementById("sup-stats");
+  if (!_suppliers.length) { statsEl.style.display="none"; return; }
+  statsEl.style.display = "";
+  statsEl.innerHTML =
+    '<div class="stat-card blue"><div class="label">عدد الموردين</div><div class="value">'+_suppliers.length+'</div><div class="sub">مورد مسجّل</div></div>'+
+    '<div class="stat-card red"><div class="label">إجمالي المستحقات</div><div class="value">'+formatPrice(totalBalance)+'</div><div class="sub">على الشركة</div></div>'+
+    '<div class="stat-card orange"><div class="label">موردون بأرصدة</div><div class="value">'+withBalance+'</div><div class="sub">لديهم رصيد مستحق</div></div>';
+}
+
+function renderList() {
+  var q = (document.getElementById("search").value||"").toLowerCase();
+  var list = q ? _suppliers.filter(function(s){
+    return (s.name+s.phone+s.address).toLowerCase().indexOf(q) !== -1;
+  }) : _suppliers;
+
+  var tbody = document.getElementById("sup-body");
+  var empty = document.getElementById("sup-empty");
+  if (!list.length) { empty.style.display=""; tbody.innerHTML=""; return; }
+  empty.style.display = "none";
+  tbody.innerHTML = list.map(function(s) {
+    return '<tr>'+
+      '<td class="fw-bold">'+esc(s.name)+'</td>'+
+      '<td class="text-muted direction-ltr">'+(s.phone||'—')+'</td>'+
+      '<td class="text-muted">'+(s.address||'—')+'</td>'+
+      '<td class="fw-bold '+(s.balance>0?'text-red':'text-green')+'">'+formatPrice(s.balance)+'</td>'+
+      '<td style="display:flex;gap:6px;flex-wrap:wrap">'+
+        '<a class="btn btn-outline btn-sm" href="supplier-invoices.html?id='+s.id+'">الفواتير</a>'+
+        '<a class="btn btn-outline btn-sm" href="supplier-statement.html?id='+s.id+'">كشف الحساب</a>'+
+        '<button class="btn btn-outline btn-sm" onclick="openPayModal('+s.id+',\''+esc(s.name)+'\')">دفعة</button>'+
+        '<button class="btn btn-outline btn-sm" onclick="editSupplier('+s.id+')">تعديل</button>'+
+        '<button class="btn btn-sm" style="background:var(--red-light);color:var(--red-text)" onclick="removeSupplier('+s.id+')">حذف</button>'+
+      '</td>'+
+    '</tr>';
+  }).join("");
+}
+
+function openAddModal() {
+  document.getElementById("edit-id").value = "";
+  document.getElementById("modal-title").textContent = "مورد جديد";
+  ["f-name","f-phone","f-address","f-email","f-notes"].forEach(function(id){
+    document.getElementById(id).value = "";
+  });
+  openModal("sup-modal");
+}
+
+function editSupplier(id) {
+  var s = _suppliers.find(function(x){return x.id===id;});
+  if (!s) return;
+  document.getElementById("edit-id").value = id;
+  document.getElementById("modal-title").textContent = "تعديل المورد";
+  document.getElementById("f-name").value    = s.name;
+  document.getElementById("f-phone").value   = s.phone||"";
+  document.getElementById("f-address").value = s.address||"";
+  document.getElementById("f-email").value   = s.email||"";
+  document.getElementById("f-notes").value   = s.notes||"";
+  openModal("sup-modal");
+}
+
+async function saveSupplier() {
+  var name = document.getElementById("f-name").value.trim();
+  if (!name) { toast("يرجى إدخال اسم المورد","error"); return; }
+  var data = {
+    name:    name,
+    phone:   document.getElementById("f-phone").value.trim(),
+    address: document.getElementById("f-address").value.trim(),
+    email:   document.getElementById("f-email").value.trim(),
+    notes:   document.getElementById("f-notes").value.trim()
+  };
+  var editId = document.getElementById("edit-id").value;
+  if (editId) {
+    await updateSupplier(Number(editId), data);
+    toast("تم تحديث بيانات المورد","success");
+  } else {
+    await addSupplier(data);
+    toast("تمت إضافة المورد","success");
+  }
+  closeModal("sup-modal");
+  _suppliers = await getSuppliers();
+  renderStats(); renderList();
+}
+
+async function removeSupplier(id) {
+  if (!confirm("هل تريد حذف هذا المورد؟ سيتم حذف جميع فواتيره أيضاً.")) return;
+  await deleteSupplier(id);
+  toast("تم حذف المورد","success");
+  _suppliers = await getSuppliers();
+  renderStats(); renderList();
+}
+
+function openPayModal(supId, supName) {
+  document.getElementById("pay-sup-id").value = supId;
+  document.getElementById("pay-sup-name").textContent = supName;
+  document.getElementById("pay-amount").value = "";
+  document.getElementById("pay-date").value = new Date().toISOString().slice(0,10);
+  document.getElementById("pay-notes").value = "";
+  openModal("pay-modal");
+}
+
+async function confirmPayment() {
+  var amount = parseFloat(document.getElementById("pay-amount").value);
+  if (!amount || amount <= 0) { toast("يرجى إدخال مبلغ صحيح","error"); return; }
+  var supId = Number(document.getElementById("pay-sup-id").value);
+  var date  = document.getElementById("pay-date").value;
+  var notes = document.getElementById("pay-notes").value.trim();
+  await addSupplierPayment(supId, amount, date, notes);
+  toast("تم تسجيل الدفعة","success");
+  closeModal("pay-modal");
+  _suppliers = await getSuppliers();
+  renderStats(); renderList();
+}
+
+load();
+</script>
+    <script src="js/auto-updater-ui.js"></script>
+</body>
+</html>

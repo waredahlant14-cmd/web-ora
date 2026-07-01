@@ -1,0 +1,244 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>إغلاق الوردية — WeB Ora</title>
+  <link rel="icon" type="image/png" href="img/mark-glow.png">
+  <link rel="stylesheet" href="css/style.css">
+  <script src="config.js"></script>
+  <script src="js/mode-manager.js"></script>
+  <script src="js/supabase.min.js"></script>
+  <script src="js/auth.js"></script>
+  <script src="js/seclog.js"></script>
+  <script src="js/currency.js"></script>
+  <script src="js/db.js"></script>
+  <script src="js/sync_queue.js"></script>
+  <script src="js/notifications.js"></script>
+  <script src="js/initial_sync.js"></script>
+  <script src="js/sync_replay.js"></script>
+    <script src="js/background_sync.js"></script>
+  <script src="js/queue.js"></script>
+  <script src="js/online.js"></script>
+  <script src="js/layout.js"></script>
+  <script src="js/nav-extend.js"></script>
+  <script src="js/shifts.js"></script>
+  <style>
+    .close-wrap   { max-width:600px;margin:0 auto }
+    .cash-input-big { font-size:32px!important;text-align:center!important;font-weight:800!important;letter-spacing:2px;height:72px!important }
+    .result-box   { border-radius:var(--radius);padding:24px;text-align:center;margin-top:24px;display:none }
+    .result-box.surplus { background:#dcfce7;border:2px solid #86efac }
+    .result-box.deficit { background:#fee2e2;border:2px solid #fca5a5 }
+    .result-box.exact   { background:#dbeafe;border:2px solid #93c5fd }
+    .result-val { font-size:48px;font-weight:900;line-height:1;margin:8px 0 }
+    .result-label { font-size:16px;font-weight:700 }
+    .summary-row { display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid var(--border) }
+    .summary-row:last-child { border:none;font-weight:700;font-size:16px }
+    .closed-screen { text-align:center;padding:48px 24px;display:none }
+    .closed-screen .big-icon { font-size:64px;margin-bottom:16px }
+  </style>
+  <script src="js/refresh-btn.js"></script>
+</head>
+<body>
+<div id="page">
+  <div class="page-head">
+    <h1>إغلاق الوردية</h1>
+    <p>أدخل النقد الفعلي في الصندوق لإتمام الإغلاق</p>
+  </div>
+
+  <!-- شاشة عدم وجود وردية -->
+  <div id="no-shift-screen" style="display:none" class="card" style="text-align:center;padding:48px">
+    <div class="empty-state">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+      لا توجد وردية مفتوحة حالياً
+    </div>
+    <a class="btn btn-primary" href="shifts.html" style="margin:16px auto 0;display:inline-flex">الذهاب للورديات</a>
+  </div>
+
+  <!-- شاشة الإغلاق -->
+  <div id="close-screen" class="close-wrap" style="display:none">
+    <!-- ملخص الوردية -->
+    <div class="card">
+      <h2 style="margin-bottom:16px">ملخص الوردية</h2>
+      <div class="summary-row">
+        <span class="text-muted">الموظف</span>
+        <span class="fw-bold" id="sum-user">—</span>
+      </div>
+      <div class="summary-row">
+        <span class="text-muted">وقت الفتح</span>
+        <span class="fw-bold direction-ltr" id="sum-opened">—</span>
+      </div>
+      <div class="summary-row">
+        <span class="text-muted">النقد الافتتاحي</span>
+        <span class="fw-bold" id="sum-opening">—</span>
+      </div>
+      <div class="summary-row">
+        <span class="text-muted">عدد الفواتير</span>
+        <span class="fw-bold" id="sum-count">—</span>
+      </div>
+      <div class="summary-row">
+        <span class="text-muted">إجمالي المبيعات</span>
+        <span class="fw-bold text-green" id="sum-sales">—</span>
+      </div>
+      <div class="summary-row">
+        <span class="text-muted">المبيعات النقدية</span>
+        <span class="fw-bold" id="sum-cash-sales">—</span>
+      </div>
+    </div>
+
+    <!-- إدخال النقد الفعلي -->
+    <div class="card" style="margin-top:20px">
+      <h2 style="margin-bottom:8px">عدّ النقد في الصندوق</h2>
+      <p class="text-muted" style="font-size:13px;margin-bottom:20px">
+        أدخل المبلغ النقدي الفعلي الموجود في الصندوق الآن — <strong>لا تنظر للنتيجة قبل العدّ</strong>.
+      </p>
+      <input class="input cash-input-big" id="actual-cash" type="number" min="0" step="0.01"
+             placeholder="0.00" oninput="onCashInput()">
+
+      <div class="field" style="margin-top:16px">
+        <label class="label">ملاحظات الوردية (اختياري)</label>
+        <textarea class="input" id="shift-notes" rows="2" placeholder="أي ملاحظات عن هذه الوردية..."></textarea>
+      </div>
+
+      <!-- صندوق النتيجة — مخفي حتى الإرسال -->
+      <div class="result-box" id="result-box">
+        <div class="result-label" id="result-label"></div>
+        <div class="result-val" id="result-val"></div>
+        <div class="text-muted" id="result-sub" style="font-size:13px;margin-top:8px"></div>
+      </div>
+
+      <div style="display:flex;gap:12px;margin-top:20px">
+        <a class="btn btn-outline" href="shifts.html" style="flex:1;justify-content:center">إلغاء</a>
+        <button class="btn btn-primary" id="close-btn" onclick="submitClose()" style="flex:2;font-size:16px;height:52px">
+          إغلاق الوردية وعرض النتيجة
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- شاشة ما بعد الإغلاق -->
+  <div id="done-screen" class="closed-screen card">
+    <div class="big-icon" id="done-icon"></div>
+    <h2 id="done-title" style="font-size:24px;margin-bottom:8px"></h2>
+    <p class="text-muted" id="done-sub" style="font-size:15px;margin-bottom:24px"></p>
+    <div id="done-details" style="background:var(--bg2);border-radius:var(--radius-sm);padding:16px;max-width:360px;margin:0 auto 24px;text-align:right"></div>
+    <div style="display:flex;gap:12px;justify-content:center;flex-wrap:wrap">
+      <button class="btn btn-outline" onclick="window.print()">طباعة تقرير الوردية</button>
+      <a class="btn btn-primary" href="shifts.html">العودة للورديات</a>
+      <a class="btn btn-outline" href="index.html">الرئيسية</a>
+    </div>
+  </div>
+</div>
+
+<script>
+renderLayout("shifts");
+
+var _shift = null;
+
+function load() {
+  _shift = getOpenShift();
+  if (!_shift) {
+    document.getElementById("no-shift-screen").style.display = "";
+    document.getElementById("close-screen").style.display   = "none";
+  } else {
+    document.getElementById("no-shift-screen").style.display = "none";
+    document.getElementById("close-screen").style.display   = "";
+    document.getElementById("sum-user").textContent    = _shift.userName;
+    document.getElementById("sum-opened").textContent  = fmtDateTime(_shift.openedAt);
+    document.getElementById("sum-opening").textContent = formatPrice(_shift.openingCash);
+    document.getElementById("sum-count").textContent   = _shift.salesCount + " فاتورة";
+    document.getElementById("sum-sales").textContent   = formatPrice(_shift.salesTotal);
+    document.getElementById("sum-cash-sales").textContent = formatPrice(_shift.cashSales);
+  }
+}
+
+function onCashInput() {
+  /* إخفاء النتيجة السابقة عند التعديل */
+  document.getElementById("result-box").style.display = "none";
+  document.getElementById("close-btn").textContent = "إغلاق الوردية وعرض النتيجة";
+}
+
+async function submitClose() {
+  var actualCash = parseFloat(document.getElementById("actual-cash").value);
+  if (isNaN(actualCash) || actualCash < 0) {
+    toast("يرجى إدخال مبلغ صحيح","error"); return;
+  }
+  var notes = document.getElementById("shift-notes").value.trim();
+
+  document.getElementById("close-btn").disabled = true;
+  document.getElementById("close-btn").textContent = "جارٍ الإغلاق...";
+
+  var res = await closeShift(actualCash, notes);
+  if (res.error) {
+    toast("خطأ: " + res.error, "error");
+    document.getElementById("close-btn").disabled = false;
+    document.getElementById("close-btn").textContent = "إغلاق الوردية وعرض النتيجة";
+    return;
+  }
+
+  /* ─── عرض النتيجة ─── */
+  var diff = res.difference;
+  var rb   = document.getElementById("result-box");
+  rb.style.display = "";
+
+  if (Math.abs(diff) < 0.01) {
+    rb.className = "result-box exact";
+    document.getElementById("result-label").textContent = "✅ الصندوق متطابق تماماً";
+    document.getElementById("result-val").textContent   = "0.00";
+    document.getElementById("result-val").style.color   = "#1d4ed8";
+    document.getElementById("result-sub").textContent   = "النقد المتوقع = النقد الفعلي = " + formatPrice(res.actual);
+  } else if (diff > 0) {
+    rb.className = "result-box surplus";
+    document.getElementById("result-label").textContent = "📈 فائض في الصندوق";
+    document.getElementById("result-val").textContent   = "+ " + formatPrice(diff);
+    document.getElementById("result-val").style.color   = "#166534";
+    document.getElementById("result-sub").textContent   =
+      "النقد المتوقع: " + formatPrice(res.expected) + " | النقد الفعلي: " + formatPrice(res.actual);
+  } else {
+    rb.className = "result-box deficit";
+    document.getElementById("result-label").textContent = "📉 عجز في الصندوق";
+    document.getElementById("result-val").textContent   = "- " + formatPrice(Math.abs(diff));
+    document.getElementById("result-val").style.color   = "#991b1b";
+    document.getElementById("result-sub").textContent   =
+      "النقد المتوقع: " + formatPrice(res.expected) + " | النقد الفعلي: " + formatPrice(res.actual);
+  }
+
+  document.getElementById("close-btn").textContent = "✓ تم الإغلاق — اضغط للمتابعة";
+  document.getElementById("close-btn").onclick = function() { showDone(res); };
+  document.getElementById("close-btn").disabled = false;
+}
+
+function showDone(res) {
+  document.getElementById("close-screen").style.display = "none";
+  var done = document.getElementById("done-screen");
+  done.style.display = "";
+
+  var diff = res.difference;
+  if (Math.abs(diff) < 0.01) {
+    document.getElementById("done-icon").textContent  = "✅";
+    document.getElementById("done-title").textContent = "تم إغلاق الوردية بنجاح — الصندوق متطابق!";
+    document.getElementById("done-sub").textContent   = "لا يوجد فارق في النقد.";
+  } else if (diff > 0) {
+    document.getElementById("done-icon").textContent  = "📈";
+    document.getElementById("done-title").textContent = "تم الإغلاق — يوجد فائض";
+    document.getElementById("done-sub").textContent   = "الصندوق يحتوي على " + formatPrice(diff) + " أكثر من المتوقع.";
+  } else {
+    document.getElementById("done-icon").textContent  = "📉";
+    document.getElementById("done-title").textContent = "تم الإغلاق — يوجد عجز";
+    document.getElementById("done-sub").textContent   = "الصندوق ينقصه " + formatPrice(Math.abs(diff)) + " عن المتوقع.";
+  }
+
+  document.getElementById("done-details").innerHTML =
+    '<div class="summary-row"><span class="text-muted">النقد الافتتاحي</span><span class="fw-bold">'+formatPrice(_shift.openingCash)+'</span></div>'+
+    '<div class="summary-row"><span class="text-muted">المبيعات النقدية</span><span class="fw-bold">'+formatPrice(_shift.cashSales)+'</span></div>'+
+    '<div class="summary-row"><span class="text-muted">النقد المتوقع</span><span class="fw-bold">'+formatPrice(res.expected)+'</span></div>'+
+    '<div class="summary-row"><span class="text-muted">النقد الفعلي</span><span class="fw-bold">'+formatPrice(res.actual)+'</span></div>'+
+    '<div class="summary-row"><span>الفرق</span><span class="fw-bold '+(diff>=0?'text-green':'text-red')+'">'+
+      (diff>=0?'فائض +':'عجز -')+formatPrice(Math.abs(diff))+'</span></div>';
+}
+
+load();
+</script>
+    <script src="js/auto-updater-ui.js"></script>
+</body>
+</html>

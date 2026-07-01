@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>تسجيل الدخول — WeB Ora</title>
+  <link rel="icon" type="image/png" href="img/mark.png">
+  <link rel="stylesheet" href="css/style.css">
+  <script src="config.js"></script>
+  <script src="js/mode-manager.js"></script>
+  <script src="js/supabase.min.js"></script>
+  <script src="js/auth.js"></script>
+  <script src="js/seclog.js"></script>
+  <script src="js/online.js"></script>
+  <script>
+    (function(){ if(localStorage.getItem("dark_mode")==="1") document.documentElement.classList.add("dark"); })();
+  </script>
+</head>
+<body>
+<div class="login-page">
+  <div class="login-card">
+    <div class="login-logo">
+      <img src="img/mark.png" alt="WeB Ora">
+    </div>
+    <h1 id="brand-name">WeB Ora</h1>
+    <p class="sub">نظام إدارة المبيعات والمحاسبة</p>
+
+    <form id="login-form" style="text-align:right" autocomplete="on">
+      <div class="field">
+        <label>اسم المستخدم</label>
+        <input class="input" id="username" autocomplete="username"
+               placeholder="أدخل اسم المستخدم" required autofocus>
+      </div>
+      <div class="field">
+        <label>كلمة المرور</label>
+        <input class="input" id="password" type="password"
+               autocomplete="current-password" placeholder="••••••••" required>
+      </div>
+
+      <p id="login-error" class="login-err" style="display:none"></p>
+      <p id="lockout-msg" style="display:none;background:#fee2e2;color:#991b1b;border-radius:8px;padding:10px 14px;font-size:13px;margin-bottom:12px;text-align:center"></p>
+
+      <button class="btn btn-primary btn-block" type="submit" id="login-btn"
+              style="padding:12px;font-size:15px">
+        دخول
+      </button>
+    </form>
+
+    <p style="font-size:11px;color:rgba(255,255,255,.4);margin-top:20px;text-align:center">
+      استخدم بيانات الدخول التي أعدّها مدير النظام
+    </p>
+  </div>
+</div>
+
+<script>
+  (async function checkSession() {
+    if (isLoggedIn()) { location.href = "index.html"; return; }
+
+    var cfg = window.APP_CONFIG || {};
+    document.getElementById("brand-name").textContent = cfg.BRAND_NAME || "WeB Ora";
+
+    /* تحقق من الإغلاق التلقائي */
+    if (isLockedOut()) {
+      var mins = lockoutRemainMins();
+      document.getElementById("lockout-msg").style.display = "block";
+      document.getElementById("lockout-msg").textContent =
+        "🔒 تم تعطيل الدخول بسبب محاولات متكررة — يرجى الانتظار " + mins + " دقيقة";
+      document.getElementById("login-btn").disabled = true;
+
+      var interval = setInterval(function(){
+        if (!isLockedOut()) {
+          clearInterval(interval);
+          document.getElementById("lockout-msg").style.display = "none";
+          document.getElementById("login-btn").disabled = false;
+        } else {
+          document.getElementById("lockout-msg").textContent =
+            "🔒 تم تعطيل الدخول — يرجى الانتظار " + lockoutRemainMins() + " دقيقة";
+        }
+      }, 15000);
+    }
+  })();
+
+  document.getElementById("login-form").addEventListener("submit", async function (e) {
+    e.preventDefault();
+    if (isLockedOut()) return;
+
+    var btn = document.getElementById("login-btn");
+    var errEl = document.getElementById("login-error");
+    var u = document.getElementById("username").value.trim();
+    var p = document.getElementById("password").value;
+
+    btn.disabled = true;
+    btn.textContent = "جارٍ التحقق…";
+    errEl.style.display = "none";
+
+    var result = await login(u, p);
+
+    if (result.success) {
+      btn.textContent = "✓ مرحباً!";
+      location.href = "index.html";
+      return;
+    }
+
+    btn.disabled = false;
+    btn.textContent = "دخول";
+    document.getElementById("password").value = "";
+
+    if (result.error === "locked") {
+      document.getElementById("lockout-msg").style.display = "block";
+      document.getElementById("lockout-msg").textContent =
+        "🔒 تم تعطيل الدخول بسبب محاولات متكررة — انتظر " + result.mins + " دقيقة";
+      btn.disabled = true;
+    } else if (result.error === "empty") {
+      errEl.style.display = "block";
+      errEl.textContent = "أدخل اسم المستخدم وكلمة المرور";
+    } else {
+      errEl.style.display = "block";
+      var rem = result.remaining;
+      errEl.textContent = "اسم المستخدم أو كلمة المرور غير صحيحة" +
+        (rem > 0 ? " — تبقى " + rem + " محاولة" : " — تم تعطيل الحساب مؤقتاً");
+    }
+  });
+</script>
+    <script src="js/auto-updater-ui.js"></script>
+</body>
+</html>

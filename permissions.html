@@ -1,0 +1,241 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>صلاحيات المستخدمين — WeB Ora</title>
+  <link rel="icon" type="image/png" href="img/mark-glow.png">
+  <link rel="stylesheet" href="css/style.css">
+  <script src="config.js"></script>
+  <script src="js/mode-manager.js"></script>
+  <script src="js/supabase.min.js"></script>
+  <script src="js/auth.js"></script>
+  <script src="js/admin-guard.js"></script>
+  <script src="js/seclog.js"></script>
+  <script src="js/currency.js"></script>
+  <script src="js/db.js"></script>
+  <script src="js/sync_queue.js"></script>
+  <script src="js/notifications.js"></script>
+  <script src="js/initial_sync.js"></script>
+  <script src="js/sync_replay.js"></script>
+    <script src="js/background_sync.js"></script>
+  <script src="js/queue.js"></script>
+  <script src="js/online.js"></script>
+  <script src="js/layout.js"></script>
+  <script src="js/nav-extend.js"></script>
+  <script src="js/permissions.js"></script>
+  <style>
+    .perm-table { width:100%;border-collapse:collapse }
+    .perm-table th,.perm-table td { padding:10px 12px;border-bottom:1px solid var(--border);text-align:center;font-size:13px }
+    .perm-table th:first-child,.perm-table td:first-child { text-align:right;font-weight:600 }
+    .perm-table th { background:var(--bg2);font-size:12px;color:var(--text-muted);font-weight:700;text-transform:uppercase }
+    .perm-cb { width:18px;height:18px;accent-color:var(--primary);cursor:pointer }
+    .role-tab { display:flex;gap:8px;margin-bottom:20px;flex-wrap:wrap }
+    .role-tab button { padding:8px 20px;border-radius:var(--radius-sm);border:1.5px solid var(--border);background:var(--card);font-size:13px;font-weight:600;cursor:pointer;transition:.15s }
+    .role-tab button.active { background:var(--primary);color:#fff;border-color:var(--primary) }
+    .all-toggle { cursor:pointer;font-size:11px;color:var(--primary);font-weight:700 }
+  </style>
+  <script src="js/refresh-btn.js"></script>
+</head>
+<body>
+<div id="page">
+  <div class="page-head">
+    <h1>صلاحيات المستخدمين</h1>
+    <p>تحديد ما يستطيع كل دور الوصول إليه وتعديله</p>
+  </div>
+
+  <div id="admin-only-block">
+    <div class="card">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:12px">
+        <div>
+          <h2 style="margin:0">إعداد الصلاحيات لكل دور</h2>
+          <p class="text-muted" style="font-size:12px;margin-top:4px">الأدمن يملك صلاحيات كاملة دائماً ولا يمكن تقييدها</p>
+        </div>
+        <button class="btn btn-primary" id="save-btn" onclick="saveCurrentPerms()">💾 حفظ الصلاحيات</button>
+      </div>
+
+      <!-- تبويبات الأدوار -->
+      <div class="role-tab" id="role-tabs"></div>
+
+      <!-- جدول الصلاحيات -->
+      <div class="table-wrap">
+        <table class="perm-table" id="perm-table">
+          <thead>
+            <tr>
+              <th>الصفحة</th>
+              <th>
+                عرض<br>
+                <span class="all-toggle" onclick="toggleAll('canView')">الكل</span>
+              </th>
+              <th>
+                إضافة<br>
+                <span class="all-toggle" onclick="toggleAll('canAdd')">الكل</span>
+              </th>
+              <th>
+                تعديل<br>
+                <span class="all-toggle" onclick="toggleAll('canEdit')">الكل</span>
+              </th>
+              <th>
+                حذف<br>
+                <span class="all-toggle" onclick="toggleAll('canDelete')">الكل</span>
+              </th>
+            </tr>
+          </thead>
+          <tbody id="perm-body"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- المستخدمون وأدوارهم -->
+    <div class="card" style="margin-top:20px">
+      <h2 style="margin-bottom:16px">المستخدمون وأدوارهم</h2>
+      <div class="table-wrap">
+        <table class="table">
+          <thead>
+            <tr><th>الاسم</th><th>اسم المستخدم</th><th>الدور</th><th>تغيير الدور</th></tr>
+          </thead>
+          <tbody id="users-body"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+renderLayout("permissions");
+
+var _currentRole = "cashier";
+var _allRoles    = ["cashier", "supervisor"];
+var _permsCache  = {};
+
+async function load() {
+  /* التحقق من أن المستخدم أدمن */
+  if (!isAdmin()) {
+    document.getElementById("admin-only-block").innerHTML =
+      '<div class="card" style="text-align:center;padding:48px">'+
+      '<p class="text-muted" style="font-size:16px">هذه الصفحة للأدمن فقط.</p>'+
+      '<a class="btn btn-primary" href="index.html" style="margin-top:16px;display:inline-flex">العودة للرئيسية</a></div>';
+    return;
+  }
+
+  /* تحميل الصلاحيات لكل دور */
+  for (var i = 0; i < _allRoles.length; i++) {
+    _permsCache[_allRoles[i]] = await getPermissions(_allRoles[i]);
+  }
+
+  renderRoleTabs();
+  renderPermsTable();
+  renderUsersTable();
+}
+
+function renderRoleTabs() {
+  var tabs = document.getElementById("role-tabs");
+  tabs.innerHTML = _allRoles.map(function(r) {
+    return '<button class="'+(r===_currentRole?'active':'')+'" onclick="switchRole(\''+r+'\')">' +
+      (r==="cashier"?"كاشير":r==="supervisor"?"مشرف":r) + '</button>';
+  }).join("") +
+  '<button onclick="addRole()" style="background:transparent;color:var(--primary)">+ إضافة دور</button>';
+}
+
+function switchRole(role) {
+  _currentRole = role;
+  renderRoleTabs();
+  renderPermsTable();
+}
+
+function renderPermsTable() {
+  var perms = _permsCache[_currentRole] || {};
+  var tbody = document.getElementById("perm-body");
+  tbody.innerHTML = PAGES_LIST.map(function(page) {
+    var p = perms[page.key] || { canView:false, canAdd:false, canEdit:false, canDelete:false };
+    function cb(field) {
+      return '<input type="checkbox" class="perm-cb" '+(p[field]?'checked':'')+
+             ' onchange="onPermChange(\''+page.key+'\',\''+field+'\',this.checked)">';
+    }
+    return '<tr>'+
+      '<td>'+esc(page.label)+'</td>'+
+      '<td>'+cb('canView')+'</td>'+
+      '<td>'+cb('canAdd')+'</td>'+
+      '<td>'+cb('canEdit')+'</td>'+
+      '<td>'+cb('canDelete')+'</td>'+
+    '</tr>';
+  }).join("");
+}
+
+function onPermChange(pageKey, field, val) {
+  if (!_permsCache[_currentRole]) _permsCache[_currentRole] = {};
+  if (!_permsCache[_currentRole][pageKey]) _permsCache[_currentRole][pageKey] = {};
+  _permsCache[_currentRole][pageKey][field] = val;
+  /* إذا أُعطيت صلاحية أعلى، فعّل العرض تلقائياً */
+  if ((field === "canAdd" || field === "canEdit" || field === "canDelete") && val) {
+    _permsCache[_currentRole][pageKey].canView = true;
+  }
+}
+
+function toggleAll(field) {
+  var perms = _permsCache[_currentRole];
+  if (!perms) return;
+  var allOn = PAGES_LIST.every(function(p) { return perms[p.key] && perms[p.key][field]; });
+  PAGES_LIST.forEach(function(p) {
+    if (!perms[p.key]) perms[p.key] = {};
+    perms[p.key][field] = !allOn;
+    if (!allOn && field !== "canView") perms[p.key].canView = true;
+  });
+  renderPermsTable();
+}
+
+async function saveCurrentPerms() {
+  var btn = document.getElementById("save-btn");
+  btn.textContent = "جارٍ الحفظ...";
+  btn.disabled = true;
+  await savePermissions(_currentRole, _permsCache[_currentRole]);
+  btn.textContent = "💾 حفظ الصلاحيات";
+  btn.disabled = false;
+  toast("تم حفظ الصلاحيات بنجاح", "success");
+}
+
+function renderUsersTable() {
+  var users = getUsers();
+  var tbody = document.getElementById("users-body");
+  tbody.innerHTML = users.map(function(u) {
+    var roleLabel = u.role==="admin" ? "أدمن" : u.role==="supervisor" ? "مشرف" : "كاشير";
+    var roleOptions = u.role==="admin" ? '<span class="badge badge-green">أدمن — لا يمكن تغييره</span>' :
+      '<select class="input" style="padding:4px 10px;height:auto;font-size:12px" onchange="changeUserRole(\''+u.id+'\',this.value)">'+
+        '<option value="cashier" '+(u.role==="cashier"?"selected":"")+'>كاشير</option>'+
+        '<option value="supervisor" '+(u.role==="supervisor"?"selected":"")+'>مشرف</option>'+
+      '</select>';
+    return '<tr>'+
+      '<td class="fw-bold">'+esc(u.name)+'</td>'+
+      '<td class="text-muted direction-ltr">'+esc(u.username)+'</td>'+
+      '<td>'+roleLabel+'</td>'+
+      '<td>'+roleOptions+'</td>'+
+    '</tr>';
+  }).join("");
+}
+
+function changeUserRole(userId, newRole) {
+  var users = getUsers();
+  for (var i = 0; i < users.length; i++) {
+    if (users[i].id === userId) { users[i].role = newRole; break; }
+  }
+  saveUsers(users);
+  toast("تم تغيير دور المستخدم", "success");
+}
+
+function addRole() {
+  var name = prompt("اسم الدور الجديد (بالإنجليزية، مثال: manager):");
+  if (!name) return;
+  name = name.trim().toLowerCase().replace(/\s+/g, "_");
+  if (!name || _allRoles.indexOf(name) !== -1) { toast("الدور موجود بالفعل أو غير صالح", "error"); return; }
+  _allRoles.push(name);
+  _permsCache[name] = Object.assign({}, DEFAULT_CASHIER_PERMS);
+  _currentRole = name;
+  renderRoleTabs();
+  renderPermsTable();
+}
+
+load();
+</script>
+    <script src="js/auto-updater-ui.js"></script>
+</body>
+</html>

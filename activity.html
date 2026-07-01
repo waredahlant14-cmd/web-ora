@@ -1,0 +1,160 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>سجل النشاطات — WeB Ora</title>
+  <link rel="icon" type="image/png" href="img/mark.png">
+  <link rel="stylesheet" href="css/style.css">
+  <script src="config.js"></script>
+  <script src="js/mode-manager.js"></script>
+  <script src="js/supabase.min.js"></script>
+  <script src="js/auth.js"></script>
+  <script src="js/seclog.js"></script>
+  <script src="js/currency.js"></script>
+  <script src="js/db.js"></script>
+  <script src="js/sync_queue.js"></script>
+  <script src="js/notifications.js"></script>
+  <script src="js/initial_sync.js"></script>
+  <script src="js/sync_replay.js"></script>
+    <script src="js/background_sync.js"></script>
+  <script src="js/queue.js"></script>
+  <script src="js/online.js"></script>
+  <script src="js/layout.js"></script>
+  <script src="js/nav-extend.js"></script>
+  <script src="js/print.js"></script>
+  <script src="js/export.js"></script>
+  <script src="js/refresh-btn.js"></script>
+</head>
+<body>
+<div id="page">
+  <div class="page-head-row">
+    <div>
+      <h1>سجل النشاطات</h1>
+      <p>تتبّع كل العمليات المنفّذة في النظام</p>
+    </div>
+    <div class="btn-group">
+      <button class="btn btn-outline" onclick="doExportExcelActivity()">
+        <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+        Excel
+      </button>
+      <button class="btn btn-outline" onclick="doExportImageActivity()">
+        <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+        صورة
+      </button>
+      <button class="btn btn-danger" onclick="doClear()">
+        <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/></svg>
+        مسح السجل
+      </button>
+    </div>
+  </div>
+
+  <div class="search-row">
+    <input class="input" id="search" placeholder="بحث في النشاطات" oninput="render()">
+    <select class="input" id="filter-type" onchange="render()">
+      <option value="">كل الأنواع</option>
+      <option value="invoice">الفواتير</option>
+      <option value="product">المنتجات</option>
+      <option value="expense">المصاريف</option>
+      <option value="employee">الموظفون</option>
+      <option value="salary">الرواتب</option>
+      <option value="customer">العملاء</option>
+      <option value="system">النظام</option>
+    </select>
+  </div>
+
+  <div class="card" id="log-card">
+    <div id="log-list"></div>
+    <div class="empty-state" id="empty" style="display:none">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+      لا توجد نشاطات مسجّلة بعد
+    </div>
+  </div>
+</div>
+
+<script>
+  renderLayout("activity");
+
+  var LOG = [];
+
+  var TYPE_MAP = {
+    invoice:  { label: "فاتورة",   cls: "green",  icon: '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/></svg>' },
+    product:  { label: "منتج",     cls: "orange", icon: '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="16.5" y1="9.4" x2="7.5" y2="4.21"/><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>' },
+    expense:  { label: "مصروف",    cls: "red",    icon: '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>' },
+    employee: { label: "موظف",     cls: "blue",   icon: '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>' },
+    salary:   { label: "راتب",     cls: "yellow", icon: '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>' },
+    customer: { label: "عميل",     cls: "blue",   icon: '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>' },
+    system:   { label: "نظام",     cls: "orange", icon: '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>' },
+  };
+
+  function load() {
+    LOG = getActivityLog();
+    render();
+  }
+
+  async function doExportExcelActivity() {
+    var q  = document.getElementById("search").value.trim().toLowerCase();
+    var tp = document.getElementById("filter-type").value;
+    var filtered = LOG.filter(function(l){
+      if (tp && l.type !== tp) return false;
+      if (!q) return true;
+      return ((l.title||"")+" "+(l.detail||"")+" "+(l.user||"")).toLowerCase().indexOf(q) !== -1;
+    });
+    await exportActivityExcel(filtered);
+  }
+
+  async function doExportImageActivity() {
+    await exportElementAsImage("log-card", "نشاطات-webora-" + new Date().toISOString().slice(0, 10));
+  }
+
+  function render() {
+    var q  = document.getElementById("search").value.trim().toLowerCase();
+    var tp = document.getElementById("filter-type").value;
+
+    var filtered = LOG.filter(function (l) {
+      if (tp && l.type !== tp) return false;
+      if (q && (l.title + " " + (l.detail || "")).toLowerCase().indexOf(q) === -1) return false;
+      return true;
+    });
+
+    var html = "";
+    filtered.forEach(function (l) {
+      var info = TYPE_MAP[l.type] || { label: l.type, cls: "orange", icon: "" };
+      html += '<div class="activity-item">' +
+        '<div class="activity-dot ' + info.cls + '">' + info.icon + '</div>' +
+        '<div class="activity-body" style="flex:1">' +
+        '<div class="title">' + esc(l.title) + '</div>' +
+        '<div class="meta">' + esc(l.detail || "") +
+        (l.user ? ' · <strong>' + esc(l.user) + '</strong>' : '') +
+        ' · ' + fmtDateTime(l.at) +
+        '</div></div>' +
+        '<span class="badge badge-' + info.cls + '" style="flex-shrink:0">' + info.label + '</span>' +
+        '<button class="btn btn-danger btn-sm" style="margin-inline-start:8px;padding:6px 10px" onclick="doDelete(\'' + esc(String(l.id)) + '\')" title="حذف هذا السجل">حذف</button>' +
+        '</div>';
+    });
+
+    document.getElementById("log-list").innerHTML = html;
+    document.getElementById("empty").style.display = filtered.length ? "none" : "block";
+  }
+
+  async function doDelete(id) {
+    if (!confirm("حذف هذا السجل؟")) return;
+    await deleteActivityEntry(id);
+    LOG = LOG.filter(function(x){ return String(x.id) !== String(id); });
+    render();
+    toast("تم حذف السجل", "success");
+  }
+
+  function doClear() {
+    if (!confirm("مسح جميع النشاطات؟ لا يمكن التراجع عن هذا الإجراء.")) return;
+    clearActivityLog();
+    LOG = [];
+    render();
+    toast("تم مسح سجل النشاطات", "success");
+  }
+
+  load();
+</script>
+    <script src="js/auto-updater-ui.js"></script>
+</body>
+</html>

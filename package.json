@@ -1,0 +1,93 @@
+{
+  "name": "web-ora-pos",
+  "version": "5.2.5",
+  "description": "WeB Ora — نظام نقطة البيع",
+  "main": "main.js",
+  "author": "WeB Ora",
+  "license": "MIT",
+  "scripts": {
+    "start": "electron .",
+    "dev": "electron . --dev",
+    "build:win": "electron-builder --win --x64",
+    "build:mac": "electron-builder --mac",
+    "build:linux": "electron-builder --linux",
+    "cap:add": "npx cap add android",
+    "cap:sync": "npx cap sync android",
+    "cap:open": "npx cap open android",
+    "build:apk": "cd android && ./gradlew assembleDebug",
+    "build:apk:release": "cd android && ./gradlew assembleRelease"
+  },
+  "dependencies": {
+    "electron-store": "^8.1.0",
+    "electron-updater": "^6.1.8",
+    "electron-log": "^5.1.2",
+    "@capacitor/core": "^5.7.0",
+    "@capacitor/android": "^5.7.0",
+    "@capacitor/splash-screen": "^5.0.7"
+  },
+  "devDependencies": {
+    "electron": "^29.0.0",
+    "electron-builder": "^24.9.1",
+    "@capacitor/cli": "^5.7.0"
+  },
+  "build": {
+    "appId": "com.webora.pos",
+    "productName": "WeB Ora POS",
+    "copyright": "Copyright © 2025 WeB Ora",
+    "directories": {
+      "output": "dist-electron"
+    },
+    "files": [
+      "**/*",
+      "!dist-electron/**",
+      "!node_modules/.cache/**",
+      "!*.md",
+      "!*.bat",
+      "!convert.js",
+      "!sync_helper.py",
+      "!download/**"
+    ],
+    "publish": {
+      "provider": "generic",
+      "url": ""
+    },
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "portable",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "img/mark.png"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "WeB Ora POS",
+      "artifactName": "WeB-Ora-POS-Setup-${version}.exe"
+    },
+    "portable": {
+      "artifactName": "WeB-Ora-POS-Portable-${version}.exe"
+    },
+    "mac": {
+      "target": "dmg",
+      "icon": "img/mark.png",
+      "category": "public.app-category.finance"
+    },
+    "linux": {
+      "target": "AppImage",
+      "icon": "img/mark.png",
+      "category": "Office"
+    }
+  }
+}

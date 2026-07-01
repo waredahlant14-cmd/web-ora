@@ -1,0 +1,320 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>كشف العملاء الآجل — WeB Ora</title>
+  <link rel="icon" type="image/png" href="img/mark-glow.png">
+  <link rel="stylesheet" href="css/style.css">
+  <script src="config.js"></script>
+  <script src="js/mode-manager.js"></script>
+  <script src="js/supabase.min.js"></script>
+  <script src="js/auth.js"></script>
+  <script src="js/seclog.js"></script>
+  <script src="js/currency.js"></script>
+  <script src="js/db.js"></script>
+  <script src="js/sync_queue.js"></script>
+  <script src="js/notifications.js"></script>
+  <script src="js/initial_sync.js"></script>
+  <script src="js/sync_replay.js"></script>
+    <script src="js/background_sync.js"></script>
+  <script src="js/queue.js"></script>
+  <script src="js/online.js"></script>
+  <script src="js/layout.js"></script>
+  <script src="js/nav-extend.js"></script>
+  <style>
+    .customer-card { border-radius:var(--radius);padding:20px;background:var(--card);border:1.5px solid var(--border);cursor:pointer;transition:var(--transition);margin-bottom:12px }
+    .customer-card:hover { border-color:var(--primary);box-shadow:var(--shadow-md) }
+    .customer-card .c-name { font-size:16px;font-weight:700;margin-bottom:4px }
+    .customer-card .c-phone { font-size:13px;color:var(--text-muted) }
+    .debt-badge { background:var(--red-light);color:var(--red-text);padding:4px 12px;border-radius:20px;font-size:13px;font-weight:700 }
+    .stmt-row { display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--border) }
+    .stmt-row:last-child { border:none }
+    .overview-bar { border-radius:var(--radius);padding:20px 24px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:16px;margin-bottom:20px }
+    .overview-bar.has-debt { background:#fee2e2;border:1.5px solid #fca5a5 }
+    .overview-bar.no-debt  { background:#dcfce7;border:1.5px solid #86efac }
+    @media print {
+      .no-print { display:none!important }
+      body { background:white!important }
+      .customer-card { page-break-inside:avoid }
+    }
+  </style>
+  <script src="js/refresh-btn.js"></script>
+</head>
+<body>
+<div id="page">
+  <div class="page-head">
+    <h1>كشف العملاء الآجل</h1>
+    <p>متابعة المبالغ غير المحصّلة من عملاء البيع بالآجل</p>
+  </div>
+
+  <!-- شريط الإجماليات -->
+  <div id="overview-bar" class="overview-bar no-debt" style="display:none">
+    <div>
+      <div style="font-size:13px;font-weight:600;margin-bottom:4px" id="ov-label">إجمالي المستحقات</div>
+      <div style="font-size:28px;font-weight:900" id="ov-total">0.00</div>
+    </div>
+    <div style="display:flex;gap:24px;flex-wrap:wrap">
+      <div style="text-align:center"><div style="font-size:22px;font-weight:800" id="ov-count">0</div><div style="font-size:11px;font-weight:700;opacity:.7">عميل بآجل</div></div>
+      <div style="text-align:center"><div style="font-size:22px;font-weight:800" id="ov-inv">0</div><div style="font-size:11px;font-weight:700;opacity:.7">فاتورة معلقة</div></div>
+    </div>
+    <div style="display:flex;gap:10px;flex-wrap:wrap" class="no-print">
+      <button class="btn btn-outline" onclick="window.print()">🖨 طباعة الكشف</button>
+    </div>
+  </div>
+
+  <!-- فلاتر -->
+  <div class="card no-print" style="display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap;margin-bottom:20px">
+    <div class="field" style="margin:0;flex:1;min-width:180px">
+      <label class="label">بحث بالاسم أو الهاتف</label>
+      <input class="input" id="search" placeholder="ابحث..." style="height:36px" oninput="renderAll()">
+    </div>
+    <div class="field" style="margin:0">
+      <label class="label">من تاريخ</label>
+      <input class="input" id="f-from" type="date" style="height:36px" onchange="renderAll()">
+    </div>
+    <div class="field" style="margin:0">
+      <label class="label">إلى تاريخ</label>
+      <input class="input" id="f-to" type="date" style="height:36px" onchange="renderAll()">
+    </div>
+    <button class="btn btn-outline" onclick="clearFilters()">مسح الفلاتر</button>
+  </div>
+
+  <!-- قائمة العملاء الآجل -->
+  <div id="customers-list"></div>
+
+  <!-- تفاصيل عميل محدد -->
+  <div id="customer-detail" style="display:none">
+    <div class="card">
+      <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:20px">
+        <div>
+          <button class="btn btn-outline btn-sm no-print" onclick="closeDetail()">← رجوع</button>
+          <h2 id="detail-name" style="margin:12px 0 4px"></h2>
+          <div class="text-muted" id="detail-info" style="font-size:13px"></div>
+        </div>
+        <div style="text-align:center">
+          <div style="font-size:11px;font-weight:700;color:var(--red-text);margin-bottom:4px">إجمالي المستحق</div>
+          <div style="font-size:32px;font-weight:900;color:var(--red)" id="detail-total">—</div>
+        </div>
+      </div>
+
+      <h3 style="margin-bottom:12px;font-size:14px">الفواتير الآجلة</h3>
+      <div class="table-wrap">
+        <table class="table">
+          <thead>
+            <tr>
+              <th>رقم الفاتورة</th>
+              <th>التاريخ</th>
+              <th>المبلغ</th>
+              <th>الحالة</th>
+              <th class="no-print">إجراءات</th>
+            </tr>
+          </thead>
+          <tbody id="detail-body"></tbody>
+        </table>
+      </div>
+
+      <!-- سطر الإجمالي -->
+      <div style="margin-top:16px;padding:14px 16px;background:var(--red-light);border-radius:var(--radius-sm);display:flex;justify-content:space-between;font-weight:700;font-size:15px">
+        <span>إجمالي المبالغ الآجلة</span>
+        <span class="text-red" id="detail-sum">—</span>
+      </div>
+
+      <!-- زر تحصيل سريع -->
+      <div style="margin-top:16px;display:flex;gap:10px;flex-wrap:wrap" class="no-print">
+        <button class="btn btn-primary" onclick="markAllPaid()">✓ تحصيل جميع المبالغ</button>
+        <button class="btn btn-outline" onclick="window.print()">🖨 طباعة كشف العميل</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="empty-state" id="main-empty" style="display:none">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
+    لا يوجد عملاء بآجل حالياً — ممتاز!
+  </div>
+</div>
+
+<script>
+renderLayout("customer-statement");
+
+var _allInvoices  = [];
+var _customers    = {};     /* phone → customer */
+var _debtMap      = {};     /* phone → [{invoice}, ...] */
+var _currentPhone = null;
+
+async function load() {
+  var [invoices, customers] = await Promise.all([getInvoices(), getCustomers()]);
+  _allInvoices = invoices;
+
+  /* بناء خريطة العملاء */
+  customers.forEach(function(c) { _customers[c.phone] = c; });
+
+  buildDebtMap();
+  renderAll();
+}
+
+function buildDebtMap(fromDate, toDate) {
+  _debtMap = {};
+  var q = document.getElementById("search") ? document.getElementById("search").value.toLowerCase() : "";
+  _allInvoices.forEach(function(inv) {
+    if (inv.paymentStatus !== "آجل") return;
+    var d = (inv.date||"").slice(0,10);
+    if (fromDate && d < fromDate) return;
+    if (toDate   && d > toDate)   return;
+    if (!inv.customer || !inv.customer.phone) return;
+    var phone = inv.customer.phone;
+    if (!_debtMap[phone]) _debtMap[phone] = [];
+    _debtMap[phone].push(inv);
+  });
+}
+
+function renderAll() {
+  var from = document.getElementById("f-from").value;
+  var to   = document.getElementById("f-to").value;
+  var q    = (document.getElementById("search").value||"").toLowerCase();
+  buildDebtMap(from, to);
+
+  var phones = Object.keys(_debtMap).filter(function(phone) {
+    if (!q) return true;
+    var cust = _customers[phone] || _debtMap[phone][0].customer || {};
+    var name = (cust.name||"").toLowerCase();
+    return name.indexOf(q) !== -1 || phone.toLowerCase().indexOf(q) !== -1;
+  });
+
+  var listEl  = document.getElementById("customers-list");
+  var emptyEl = document.getElementById("main-empty");
+  var ovBar   = document.getElementById("overview-bar");
+
+  /* إخفاء تفاصيل العميل عند تغيير الفلتر */
+  document.getElementById("customer-detail").style.display = "none";
+  _currentPhone = null;
+
+  if (!phones.length) {
+    listEl.innerHTML = "";
+    emptyEl.style.display = "";
+    ovBar.style.display   = "none";
+    return;
+  }
+  emptyEl.style.display = "none";
+
+  var totalDebt = 0, totalInv = 0;
+  phones.forEach(function(phone) {
+    var invs = _debtMap[phone];
+    var debt = invs.reduce(function(a,v){return a+v.total;},0);
+    totalDebt += debt;
+    totalInv  += invs.length;
+  });
+
+  /* شريط الإجماليات */
+  ovBar.style.display    = "";
+  ovBar.className        = "overview-bar " + (totalDebt > 0 ? "has-debt" : "no-debt");
+  document.getElementById("ov-total").textContent = formatPrice(totalDebt);
+  document.getElementById("ov-count").textContent = phones.length;
+  document.getElementById("ov-inv").textContent   = totalInv;
+  document.getElementById("ov-label").textContent = totalDebt > 0 ? "إجمالي المستحقات" : "تم التحصيل";
+
+  /* قائمة العملاء */
+  listEl.innerHTML = phones.sort(function(a,b) {
+    var da = _debtMap[a].reduce(function(s,v){return s+v.total;},0);
+    var db = _debtMap[b].reduce(function(s,v){return s+v.total;},0);
+    return db - da;
+  }).map(function(phone) {
+    var invs = _debtMap[phone];
+    var cust = _customers[phone] || (invs[0].customer) || {};
+    var debt = invs.reduce(function(a,v){return a+v.total;},0);
+    var oldest = invs.reduce(function(a,b){ return (!a.date||b.date<a.date)?b:a; }, {}).date||"";
+    return '<div class="customer-card" onclick="showDetail(\''+esc(phone)+'\')">'+
+      '<div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:8px">'+
+        '<div>'+
+          '<div class="c-name">'+esc(cust.name||phone)+'</div>'+
+          '<div class="c-phone direction-ltr">'+esc(phone)+'</div>'+
+          (oldest?'<div class="text-muted" style="font-size:12px;margin-top:4px">أقدم فاتورة: '+fmtDate(oldest)+'</div>':'')+
+        '</div>'+
+        '<div style="text-align:left">'+
+          '<div class="debt-badge">'+formatPrice(debt)+'</div>'+
+          '<div class="text-muted" style="font-size:12px;margin-top:4px;text-align:center">'+invs.length+' فاتورة</div>'+
+        '</div>'+
+      '</div>'+
+    '</div>';
+  }).join("");
+}
+
+function showDetail(phone) {
+  _currentPhone = phone;
+  var invs = _debtMap[phone] || [];
+  var cust = _customers[phone] || (invs[0] && invs[0].customer) || {};
+  var debt = invs.reduce(function(a,v){return a+v.total;},0);
+
+  document.getElementById("customers-list").style.display = "none";
+  document.getElementById("overview-bar").style.display   = "none";
+  document.getElementById("customer-detail").style.display = "";
+
+  document.getElementById("detail-name").textContent  = cust.name||phone;
+  document.getElementById("detail-info").innerHTML    =
+    '📞 <span class="direction-ltr">'+esc(phone)+'</span>' +
+    (cust.address ? ' &nbsp;|&nbsp; 📍 '+esc(cust.address) : '');
+  document.getElementById("detail-total").textContent = formatPrice(debt);
+  document.getElementById("detail-sum").textContent   = formatPrice(debt);
+
+  var tbody = document.getElementById("detail-body");
+  tbody.innerHTML = invs.sort(function(a,b){return a.date>b.date?1:-1;}).map(function(inv) {
+    return '<tr>'+
+      '<td class="fw-bold direction-ltr">'+esc(inv.invoiceNumber)+'</td>'+
+      '<td class="text-muted">'+fmtDate(inv.date)+'</td>'+
+      '<td class="fw-bold text-red">'+formatPrice(inv.total)+'</td>'+
+      '<td><span class="badge badge-red">آجل</span></td>'+
+      '<td class="no-print">'+
+        '<button class="btn btn-outline btn-sm" onclick="markPaid(\''+esc(inv.invoiceNumber)+'\')">✓ تحصيل</button>'+
+      '</td>'+
+    '</tr>';
+  }).join("");
+}
+
+function closeDetail() {
+  _currentPhone = null;
+  document.getElementById("customer-detail").style.display = "none";
+  document.getElementById("customers-list").style.display  = "";
+  document.getElementById("overview-bar").style.display    = "";
+}
+
+async function markPaid(invoiceNumber) {
+  if (!confirm("تأكيد تحصيل الفاتورة " + invoiceNumber + "؟")) return;
+  await updateInvoiceStatus(invoiceNumber, "مدفوع");
+  toast("تم تحصيل الفاتورة", "success");
+  /* تحديث البيانات المحلية */
+  _allInvoices = await getInvoices();
+  buildDebtMap();
+  /* إذا كان العميل لا يزال بآجل — أعد عرض التفاصيل، وإلا ارجع للقائمة */
+  if (_debtMap[_currentPhone] && _debtMap[_currentPhone].length) {
+    showDetail(_currentPhone);
+  } else {
+    closeDetail();
+    renderAll();
+  }
+}
+
+async function markAllPaid() {
+  var invs = _debtMap[_currentPhone];
+  if (!invs || !invs.length) return;
+  if (!confirm("تأكيد تحصيل جميع الفواتير الآجلة لهذا العميل؟")) return;
+  for (var i = 0; i < invs.length; i++) {
+    await updateInvoiceStatus(invs[i].invoiceNumber, "مدفوع");
+  }
+  toast("تم تحصيل جميع الفواتير", "success");
+  _allInvoices = await getInvoices();
+  closeDetail();
+  renderAll();
+}
+
+function clearFilters() {
+  document.getElementById("search").value = "";
+  document.getElementById("f-from").value = "";
+  document.getElementById("f-to").value   = "";
+  renderAll();
+}
+
+load();
+</script>
+    <script src="js/auto-updater-ui.js"></script>
+</body>
+</html>

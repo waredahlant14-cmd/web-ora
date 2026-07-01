@@ -1,0 +1,183 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>العملاء — WeB Ora</title>
+  <link rel="icon" type="image/png" href="img/mark.png">
+  <link rel="stylesheet" href="css/style.css">
+  <script src="config.js"></script>
+  <script src="js/mode-manager.js"></script>
+  <script src="js/supabase.min.js"></script>
+  <script src="js/auth.js"></script>
+  <script src="js/seclog.js"></script>
+  <script src="js/currency.js"></script>
+  <script src="js/db.js"></script>
+  <script src="js/sync_queue.js"></script>
+  <script src="js/notifications.js"></script>
+  <script src="js/initial_sync.js"></script>
+  <script src="js/sync_replay.js"></script>
+    <script src="js/background_sync.js"></script>
+  <script src="js/python_sync_bridge.js"></script>
+  <script src="js/queue.js"></script>
+  <script src="js/online.js"></script>
+  <script src="js/layout.js"></script>
+  <script src="js/nav-extend.js"></script>
+  <script src="js/refresh-btn.js"></script>
+</head>
+<body>
+<div id="page">
+  <div class="page-head-row">
+    <div>
+      <h1>العملاء</h1>
+      <p>يُسجَّل العميل تلقائياً عند إنشاء فاتورة برقم جواله</p>
+    </div>
+    <button class="btn btn-primary" onclick="openAdd()">
+      <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+      عميل جديد
+    </button>
+  </div>
+
+  <div class="search-row">
+    <input class="input" id="search" placeholder="بحث بالاسم أو رقم الجوال" oninput="render()">
+  </div>
+
+  <div class="card">
+    <div class="table-wrap">
+      <table class="table">
+        <thead>
+          <tr><th>العميل</th><th>الجوال</th><th>العنوان</th><th>إجمالي المشتريات</th><th>آخر فاتورة</th><th>الفواتير</th><th></th></tr>
+        </thead>
+        <tbody id="body"></tbody>
+      </table>
+    </div>
+    <div class="empty-state" id="empty" style="display:none">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+      لا يوجد عملاء — أنشئ فاتورة برقم جوال لإضافة عميل تلقائياً
+    </div>
+  </div>
+</div>
+
+<!-- نافذة آخر الفواتير -->
+<div class="modal-overlay" id="invoices-modal">
+  <div class="modal" style="max-width:700px;width:95%">
+    <h3>
+      <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/></svg>
+      <span id="inv-modal-title">فواتير العميل</span>
+    </h3>
+    <div id="inv-modal-body" style="max-height:400px;overflow-y:auto"></div>
+    <div class="modal-actions">
+      <button class="btn btn-primary" id="inv-modal-new-btn" onclick="">إضافة فاتورة جديدة</button>
+      <button class="btn btn-outline" onclick="closeModal('invoices-modal')">إغلاق</button>
+    </div>
+  </div>
+</div>
+
+<!-- نافذة إضافة -->
+<div class="modal-overlay" id="modal">
+  <div class="modal">
+    <h3>
+      <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
+      عميل جديد
+    </h3>
+    <div class="field"><label>رقم الجوال *</label><input class="input" id="f-phone" inputmode="tel" placeholder="05XXXXXXXX"></div>
+    <div class="field"><label>الاسم</label><input class="input" id="f-name" placeholder="اسم العميل"></div>
+    <div class="field"><label>العنوان</label><input class="input" id="f-address" placeholder="المدينة / الحي"></div>
+    <div class="modal-actions">
+      <button class="btn btn-primary" onclick="save()">حفظ</button>
+      <button class="btn btn-outline" onclick="closeModal('modal')">إلغاء</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  renderLayout("customers");
+
+  var CUSTOMERS = [];
+
+  async function load() { CUSTOMERS = await getCustomers(); render(); }
+
+  async function showInvoices(phone, name) {
+    document.getElementById("inv-modal-title").textContent = "فواتير: " + (name||phone);
+    var newBtn = document.getElementById("inv-modal-new-btn");
+    newBtn.onclick = function(){ location.href = "new-invoice.html?phone=" + encodeURIComponent(phone) + "&name=" + encodeURIComponent(name||""); };
+    var bodyEl = document.getElementById("inv-modal-body");
+    bodyEl.innerHTML = '<div style="text-align:center;padding:20px;color:var(--text-muted)">جارٍ التحميل…</div>';
+    openModal("invoices-modal");
+    var all = await getInvoices();
+    var cust_inv = all.filter(function(i){ return i.customer && i.customer.phone === phone; });
+    if (!cust_inv.length) {
+      bodyEl.innerHTML = '<div class="empty-state" style="padding:20px">لا توجد فواتير لهذا العميل بعد</div>';
+      return;
+    }
+    var html = '<table class="table"><thead><tr><th>رقم الفاتورة</th><th>التاريخ</th><th>الإجمالي</th><th>الحالة</th></tr></thead><tbody>';
+    cust_inv.slice(0, 20).forEach(function(i){
+      var paid = i.paymentStatus === "مدفوع";
+      html += "<tr>" +
+        "<td class='fw-bold' style='direction:ltr'>" + esc(i.invoiceNumber) + "</td>" +
+        "<td>" + fmtDate(i.date) + "</td>" +
+        "<td class='fw-bold text-green'>" + formatPrice(i.total) + "</td>" +
+        "<td><span class='badge " + (paid?"badge-green":"badge-red") + "'>" + esc(i.paymentStatus||"—") + "</span></td>" +
+        "</tr>";
+    });
+    html += '</tbody></table>';
+    if (cust_inv.length > 20) html += '<p class="text-muted" style="font-size:12px;text-align:center;margin-top:8px">تُعرض آخر 20 فاتورة</p>';
+    bodyEl.innerHTML = html;
+  }
+
+  function render() {
+    var q = document.getElementById("search").value.trim().toLowerCase();
+    var filtered = CUSTOMERS.filter(function (c) {
+      if (!q) return true;
+      return ((c.name || "") + " " + c.phone).toLowerCase().indexOf(q) !== -1;
+    });
+
+    var html = "";
+    filtered.forEach(function (c) {
+      var phoneParam = encodeURIComponent(c.phone);
+      var nameParam  = encodeURIComponent(c.name||"");
+      html += "<tr>" +
+        "<td class='fw-bold'>" + esc(c.name || "—") + "</td>" +
+        "<td style='direction:ltr;text-align:right;font-family:monospace'>" + esc(c.phone) + "</td>" +
+        "<td>" + esc(c.address || "—") + "</td>" +
+        "<td class='fw-bold text-green'>" + formatPrice(c.totalSpent || 0) + "</td>" +
+        "<td class='text-muted'>" + (c.lastInvoiceDate ? fmtDate(c.lastInvoiceDate) : "—") + "</td>" +
+        "<td><div style='display:flex;gap:5px;flex-wrap:wrap'>" +
+        "<button class='btn btn-outline btn-sm' onclick='showInvoices(\"" + esc(c.phone) + "\",\"" + esc(c.name||"") + "\")'>" +
+        "<svg xmlns='http://www.w3.org/2000/svg' width='11' height='11' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2'><path d='M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z'/></svg>" +
+        " آخر الفواتير</button>" +
+        "<a class='btn btn-primary btn-sm' href='new-invoice.html?phone=" + phoneParam + "&name=" + nameParam + "'>" +
+        "<svg xmlns='http://www.w3.org/2000/svg' width='11' height='11' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2'><line x1='12' y1='5' x2='12' y2='19'/><line x1='5' y1='12' x2='19' y2='12'/></svg>" +
+        " فاتورة</a>" +
+        "<button class='btn btn-danger btn-sm' onclick='remove(\"" + esc(c.phone) + "\")'>" +
+        "<svg xmlns='http://www.w3.org/2000/svg' width='11' height='11' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2'><polyline points='3 6 5 6 21 6'/><path d='M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6'/></svg>" +
+        " حذف</button>" +
+        "</div></td></tr>";
+    });
+    document.getElementById("body").innerHTML = html;
+    document.getElementById("empty").style.display = filtered.length ? "none" : "block";
+  }
+
+  function openAdd() {
+    ["f-phone","f-name","f-address"].forEach(function (id) { document.getElementById(id).value = ""; });
+    openModal("modal");
+  }
+
+  async function save() {
+    var phone = document.getElementById("f-phone").value.trim();
+    if (!phone) { toast("رقم الجوال مطلوب", "error"); return; }
+    await addCustomer({ phone: phone, name: document.getElementById("f-name").value.trim(), address: document.getElementById("f-address").value.trim() });
+    toast("تمت إضافة العميل", "success");
+    closeModal("modal"); load();
+  }
+
+  async function remove(phone) {
+    if (!confirm("حذف هذا العميل؟")) return;
+    await deleteCustomer(phone); toast("تم حذف العميل", "success"); load();
+  }
+
+  load();
+</script>
+    <script src="js/auto-updater-ui.js"></script>
+</body>
+</html>

@@ -1,0 +1,296 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ماسح الرمز — WeB Ora</title>
+  <link rel="icon" type="image/png" href="img/mark.png">
+  <link rel="stylesheet" href="css/style.css">
+  <script src="config.js"></script>
+  <script src="js/mode-manager.js"></script>
+  <script src="js/supabase.min.js"></script>
+  <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+  <script src="js/auth.js"></script>
+  <script src="js/seclog.js"></script>
+  <script src="js/currency.js"></script>
+  <script src="js/db.js"></script>
+  <script src="js/sync_queue.js"></script>
+  <script src="js/notifications.js"></script>
+  <script src="js/initial_sync.js"></script>
+  <script src="js/sync_replay.js"></script>
+    <script src="js/background_sync.js"></script>
+  <script src="js/queue.js"></script>
+  <script src="js/online.js"></script>
+  <script src="js/layout.js"></script>
+  <script src="js/refresh-btn.js"></script>
+</head>
+<body>
+<div id="page">
+  <div class="page-head">
+    <h1 id="page-title">ماسح الرمز</h1>
+    <p id="page-sub">امسح باركود أو رمز QR للمنتج — يتطلب HTTPS للكاميرا</p>
+  </div>
+
+  <div class="card">
+    <!-- تبديل وضع المسح -->
+    <div style="margin-bottom:18px">
+      <div style="font-size:13px;font-weight:700;color:var(--text-muted);margin-bottom:8px">وضع المسح</div>
+      <div class="btn-group">
+        <button class="btn" id="mode-barcode" onclick="setMode('barcode')" style="gap:8px">
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 5v4"/><path d="M3 11v2"/><path d="M3 17v2"/><path d="M7 5v14"/><path d="M11 5v4"/><path d="M11 11v2"/><path d="M11 17v2"/><path d="M15 5v14"/><path d="M19 5v4"/><path d="M19 11v2"/><path d="M19 17v2"/></svg>
+          باركود خطي
+        </button>
+        <button class="btn" id="mode-qr" onclick="setMode('qr')" style="gap:8px">
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="5" y="5" width="3" height="3" fill="currentColor"/><rect x="16" y="5" width="3" height="3" fill="currentColor"/><rect x="16" y="16" width="3" height="3" fill="currentColor"/><rect x="5" y="16" width="3" height="3" fill="currentColor"/></svg>
+          QR كود
+        </button>
+      </div>
+      <p id="mode-desc" style="font-size:12px;color:var(--text-muted);margin-top:6px"></p>
+    </div>
+
+    <!-- منطقة الكاميرا -->
+    <div id="reader" style="width:100%;max-width:440px;margin:0 auto 16px;border-radius:var(--radius);overflow:hidden;background:#000;min-height:2px"></div>
+
+    <div class="btn-group" style="justify-content:center;margin-bottom:16px">
+      <button class="btn btn-primary" id="start-btn" onclick="startScan()">
+        <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+        تشغيل الكاميرا
+      </button>
+      <button class="btn btn-outline" id="stop-btn" onclick="stopScan()" style="display:none">
+        <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/></svg>
+        إيقاف الكاميرا
+      </button>
+    </div>
+
+    <hr class="divider">
+
+    <!-- البحث اليدوي -->
+    <div class="field" style="margin-bottom:0">
+      <label>
+        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        أو أدخل الرمز يدوياً
+      </label>
+      <div style="display:flex;gap:8px">
+        <input class="input" id="manual-code"
+               placeholder="أدخل الباركود أو رمز QR…"
+               style="direction:ltr;text-align:right;font-family:monospace">
+        <button class="btn btn-outline" onclick="lookup(document.getElementById('manual-code').value.trim())">بحث</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- نتيجة البحث -->
+  <div class="card" id="result-card" style="display:none">
+    <h2>
+      <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+      نتيجة المسح
+    </h2>
+    <div id="result"></div>
+  </div>
+
+  <!-- آخر عمليات المسح -->
+  <div class="card" id="history-card" style="display:none">
+    <div class="flex-between" style="margin-bottom:12px">
+      <h2 style="margin-bottom:0">آخر عمليات المسح</h2>
+      <button class="btn btn-danger btn-sm" onclick="clearHistory()">مسح السجل</button>
+    </div>
+    <div id="history-list"></div>
+  </div>
+</div>
+
+<script>
+  renderLayout("scanner");
+
+  /* ─── أوضاع المسح ─── */
+  var BARCODE_FORMATS = [];
+  var QR_FORMATS      = [];
+
+  /* تعبئة القوائم بعد تحميل المكتبة */
+  function initFormats() {
+    if (!window.Html5QrcodeSupportedFormats) return;
+    var F = Html5QrcodeSupportedFormats;
+    BARCODE_FORMATS = [F.EAN_13, F.EAN_8, F.CODE_128, F.CODE_39, F.UPC_A, F.UPC_E, F.ITF, F.CODABAR, F.CODE_93];
+    QR_FORMATS      = [F.QR_CODE, F.DATA_MATRIX, F.AZTEC, F.PDF_417];
+  }
+
+  var scanMode = "barcode";  /* الافتراضي */
+  var scanner  = null;
+  var scanning = false;
+  var SCAN_HISTORY = JSON.parse(localStorage.getItem("scan_history") || "[]");
+
+  /* اقرأ الوضع المحفوظ من الإعدادات أو localStorage */
+  (function loadMode() {
+    var saved = localStorage.getItem("pos_scan_mode");
+    var cs = (typeof getCustomSettings==="function") ? getCustomSettings() : {};
+    scanMode = saved || cs.scanMode || "barcode";
+    applyModeUI();
+  })();
+
+  function setMode(mode) {
+    if (scanning) stopScan();
+    scanMode = mode;
+    localStorage.setItem("pos_scan_mode", mode);
+    /* حفظ في إعدادات التخصيص أيضاً */
+    if (typeof getCustomSettings==="function") {
+      var cs = getCustomSettings();
+      cs.scanMode = mode;
+      saveCustomSettings(cs);
+    }
+    applyModeUI();
+  }
+
+  function applyModeUI() {
+    var bBtn = document.getElementById("mode-barcode");
+    var qBtn = document.getElementById("mode-qr");
+    var desc = document.getElementById("mode-desc");
+    var title= document.getElementById("page-title");
+    var sub  = document.getElementById("page-sub");
+
+    if (scanMode === "qr") {
+      bBtn.className = "btn btn-outline";
+      qBtn.className = "btn btn-primary";
+      desc.textContent = "منطقة المسح مربّعة — مناسبة لرموز QR";
+      title.textContent = "ماسح QR كود";
+      sub.textContent   = "امسح رمز QR للمنتج بالكاميرا أو أدخله يدوياً";
+    } else {
+      bBtn.className = "btn btn-primary";
+      qBtn.className = "btn btn-outline";
+      desc.textContent = "منطقة المسح مستطيلة — مناسبة للبارك وود الخطي";
+      title.textContent = "ماسح الباركود";
+      sub.textContent   = "امسح باركود المنتج بالكاميرا أو أدخله يدوياً";
+    }
+  }
+
+  /* ─── المسح ─── */
+  async function startScan() {
+    if (scanning) return;
+    if (!window.Html5Qrcode) {
+      toast("مكتبة المسح لم تُحمّل — تحقق من الإنترنت", "error");
+      return;
+    }
+    initFormats();
+
+    var qrbox = scanMode === "qr"
+      ? { width: 250, height: 250 }
+      : { width: 280, height: 120 };
+
+    var fmts = scanMode === "qr" ? QR_FORMATS : BARCODE_FORMATS;
+    var config = { fps: 12, qrbox: qrbox };
+    if (fmts.length) config.formatsToSupport = fmts;
+
+    scanner = new Html5Qrcode("reader");
+    try {
+      await scanner.start(
+        { facingMode: "environment" },
+        config,
+        function (decodedText) {
+          stopScan();
+          document.getElementById("manual-code").value = decodedText;
+          lookup(decodedText);
+        },
+        function () {}
+      );
+      scanning = true;
+      document.getElementById("start-btn").style.display  = "none";
+      document.getElementById("stop-btn").style.display = "inline-flex";
+    } catch (e) {
+      toast("تعذّر تشغيل الكاميرا — تأكد من السماح بالوصول وأن الرابط HTTPS", "error");
+    }
+  }
+
+  function stopScan() {
+    if (scanner && scanning) {
+      scanner.stop().catch(function () {});
+      scanning = false;
+    }
+    document.getElementById("start-btn").style.display  = "inline-flex";
+    document.getElementById("stop-btn").style.display = "none";
+  }
+
+  /* ─── البحث عن المنتج ─── */
+  async function lookup(code) {
+    if (!code) { toast("أدخل الرمز أولاً", "error"); return; }
+    var p    = await getProductByBarcode(code);
+    var card = document.getElementById("result-card");
+    var box  = document.getElementById("result");
+    card.style.display = "block";
+
+    if (!p) {
+      box.innerHTML =
+        '<div class="empty-state">' +
+        '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>' +
+        'لا يوجد منتج بهذا الرمز: <strong style="direction:ltr;display:inline-block">' + esc(code) + '</strong><br><br>' +
+        '<a class="btn btn-primary" href="products.html">+ إضافته كمنتج جديد</a></div>';
+      addToHistory(code, "غير موجود", false);
+      return;
+    }
+
+    addToHistory(code, p.name, true);
+    var low = p.stock <= (p.minStock || 5);
+    box.innerHTML =
+      '<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px">' +
+      '<div>' +
+      '<div class="fw-bold" style="font-size:18px">' + esc(p.name) + '</div>' +
+      '<div class="text-muted" style="font-size:13px;margin-top:4px">' +
+      (p.category ? '<span class="badge badge-gray">' + esc(p.category) + '</span> · ' : '') +
+      'رمز: <span style="direction:ltr;font-family:monospace">' + esc(p.barcode) + '</span></div></div>' +
+      '<div style="text-align:left">' +
+      '<div class="fw-bold text-green" style="font-size:20px">' + formatPrice(p.price) + '</div>' +
+      '<span class="badge ' + (p.stock===0?"badge-red":(low?"badge-yellow":"badge-green")) + '" style="margin-top:4px">' +
+      'مخزون: ' + p.stock + '</span></div></div>' +
+      '<div class="btn-group" style="margin-top:14px">' +
+      '<button class="btn btn-primary" onclick="sendToInvoice(\'' + esc(p.barcode) + '\')">' +
+      '<svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/></svg>' +
+      'إضافة لفاتورة جديدة</button>' +
+      '<a class="btn btn-outline" href="stock.html">' +
+      '<svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="21 8 21 21 3 21 3 8"/><rect x="1" y="3" width="22" height="5"/></svg>' +
+      'تعديل المخزون</a></div>';
+  }
+
+  document.getElementById("manual-code").addEventListener("keydown", function (e) {
+    if (e.key === "Enter") { e.preventDefault(); lookup(this.value.trim()); }
+  });
+
+  function sendToInvoice(barcode) {
+    stopScan();
+    localStorage.setItem("pending_barcode", barcode);
+    location.href = "new-invoice.html";
+  }
+
+  /* ─── السجل ─── */
+  function renderHistory() {
+    if (!SCAN_HISTORY.length) { document.getElementById("history-card").style.display="none"; return; }
+    document.getElementById("history-card").style.display = "block";
+    var html = "";
+    SCAN_HISTORY.slice(0,10).forEach(function(s){
+      html += '<div class="activity-item">' +
+        '<div class="activity-dot '+(s.found?"green":"red")+'">' +
+        '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 7V5a2 2 0 0 1 2-2h2"/><path d="M17 3h2a2 2 0 0 1 2 2v2"/><path d="M21 17v2a2 2 0 0 1-2 2h-2"/><path d="M7 21H5a2 2 0 0 1-2-2v-2"/></svg>' +
+        '</div>' +
+        '<div class="activity-body">' +
+        '<div class="title">'+esc(s.name||s.code)+'</div>' +
+        '<div class="meta" style="direction:ltr;text-align:right">'+esc(s.code)+' · '+fmtDateTime(s.at)+'</div>' +
+        '</div>' +
+        (s.found?'<button class="btn btn-primary btn-sm" onclick="sendToInvoice(\''+esc(s.code)+'\')">إضافة لفاتورة</button>':'') +
+        '</div>';
+    });
+    document.getElementById("history-list").innerHTML = html;
+  }
+
+  function addToHistory(code, name, found) {
+    SCAN_HISTORY.unshift({code:code, name:name, found:found, at:new Date().toISOString()});
+    if (SCAN_HISTORY.length>20) SCAN_HISTORY=SCAN_HISTORY.slice(0,20);
+    localStorage.setItem("scan_history", JSON.stringify(SCAN_HISTORY));
+    renderHistory();
+  }
+
+  function clearHistory() {
+    SCAN_HISTORY=[]; localStorage.removeItem("scan_history");
+    document.getElementById("history-card").style.display="none";
+  }
+
+  renderHistory();
+</script>
+    <script src="js/auto-updater-ui.js"></script>
+</body>
+</html>

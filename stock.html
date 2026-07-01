@@ -1,0 +1,153 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>المخزون — WeB Ora</title>
+  <link rel="icon" type="image/png" href="img/mark.png">
+  <link rel="stylesheet" href="css/style.css">
+  <script src="config.js"></script>
+  <script src="js/mode-manager.js"></script>
+  <script src="js/supabase.min.js"></script>
+  <script src="js/auth.js"></script>
+  <script src="js/seclog.js"></script>
+  <script src="js/currency.js"></script>
+  <script src="js/db.js"></script>
+  <script src="js/sync_queue.js"></script>
+  <script src="js/notifications.js"></script>
+  <script src="js/initial_sync.js"></script>
+  <script src="js/sync_replay.js"></script>
+    <script src="js/background_sync.js"></script>
+  <script src="js/python_sync_bridge.js"></script>
+  <script src="js/queue.js"></script>
+  <script src="js/online.js"></script>
+  <script src="js/layout.js"></script>
+  <script src="js/nav-extend.js"></script>
+  <script src="js/refresh-btn.js"></script>
+</head>
+<body>
+<div id="page">
+  <div class="page-head">
+    <h1>المخزون</h1>
+    <p>متابعة الكميات وتعديلها بسرعة</p>
+  </div>
+
+  <div class="stats-grid">
+    <div class="stat-card"><div class="label">إجمالي الأصناف</div><div class="value" id="st-count">—</div></div>
+    <div class="stat-card green"><div class="label">قيمة المخزون (بيع)</div><div class="value" id="st-value">—</div></div>
+    <div class="stat-card orange"><div class="label">قيمة التكلفة</div><div class="value" id="st-cost">—</div></div>
+    <div class="stat-card red"><div class="label">أصناف منخفضة</div><div class="value" id="st-low">—</div></div>
+    <div class="stat-card red"><div class="label">نفد المخزون</div><div class="value" id="st-zero">—</div></div>
+  </div>
+
+  <div class="search-row">
+    <input class="input" id="search" placeholder="بحث باسم المنتج" oninput="render()">
+    <select class="input" id="filter-status" onchange="render()">
+      <option value="">كل الأصناف</option>
+      <option value="low">المنخفض فقط</option>
+      <option value="zero">نفد فقط</option>
+      <option value="ok">جيد فقط</option>
+    </select>
+  </div>
+
+  <!-- تعديل جماعي سريع -->
+  <div class="card">
+    <h2>
+      <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="21 8 21 21 3 21 3 8"/><rect x="1" y="3" width="22" height="5"/><line x1="10" y1="12" x2="14" y2="12"/></svg>
+      قائمة المخزون
+    </h2>
+    <div class="table-wrap">
+      <table class="table">
+        <thead><tr><th>المنتج</th><th>المخزون الحالي</th><th>حد التنبيه</th><th>الحالة</th><th>تعديل سريع</th><th>تعيين كمية</th></tr></thead>
+        <tbody id="body"></tbody>
+      </table>
+    </div>
+    <div class="empty-state" id="empty" style="display:none">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><polyline points="21 8 21 21 3 21 3 8"/><rect x="1" y="3" width="22" height="5"/></svg>
+      لا توجد منتجات
+    </div>
+  </div>
+</div>
+
+<script>
+  renderLayout("stock");
+
+  var PRODUCTS = [];
+
+  async function load() {
+    PRODUCTS = await getProducts();
+    var value = 0, cost = 0, low = 0, zero = 0;
+    PRODUCTS.forEach(function (p) {
+      value += p.price * p.stock;
+      cost  += (p.costPrice || 0) * p.stock;
+      var min = p.minStock || 5;
+      if (p.stock === 0) zero++;
+      else if (p.stock <= min) low++;
+    });
+    document.getElementById("st-count").textContent = PRODUCTS.length;
+    document.getElementById("st-value").textContent = formatPrice(value);
+    document.getElementById("st-cost").textContent  = formatPrice(cost);
+    document.getElementById("st-low").textContent   = low;
+    document.getElementById("st-zero").textContent  = zero;
+    render();
+  }
+
+  function render() {
+    var q  = document.getElementById("search").value.trim().toLowerCase();
+    var st = document.getElementById("filter-status").value;
+
+    var filtered = PRODUCTS.filter(function (p) {
+      var min = p.minStock || 5;
+      if (st === "low"  && !(p.stock > 0 && p.stock <= min)) return false;
+      if (st === "zero" && p.stock !== 0) return false;
+      if (st === "ok"   && p.stock <= min) return false;
+      if (q && (p.name || "").toLowerCase().indexOf(q) === -1) return false;
+      return true;
+    });
+
+    var html = "";
+    filtered.forEach(function (p) {
+      var min = p.minStock || 5;
+      var statusCls = p.stock === 0 ? "badge-red" : (p.stock <= min ? "badge-yellow" : "badge-green");
+      var statusTxt = p.stock === 0 ? "نفد" : (p.stock <= min ? "منخفض" : "جيد");
+      html += "<tr>" +
+        "<td class='fw-bold'>" + esc(p.name) +
+        (p.category ? " <span class='badge badge-gray' style='font-size:10px'>" + esc(p.category) + "</span>" : "") + "</td>" +
+        "<td class='fw-bold'>" + p.stock + "</td>" +
+        "<td class='text-muted'>" + min + "</td>" +
+        "<td><span class='badge " + statusCls + "'>" + statusTxt + "</span></td>" +
+        "<td><div style='display:flex;gap:5px;align-items:center'>" +
+        "<button class='btn btn-outline btn-sm' onclick='adj(" + p.id + ",-1)'>−1</button>" +
+        "<button class='btn btn-outline btn-sm' onclick='adj(" + p.id + ",1)'>+1</button>" +
+        "<button class='btn btn-green btn-sm' onclick='adj(" + p.id + ",10)'>+10</button>" +
+        "</div></td>" +
+        "<td><div style='display:flex;gap:6px;align-items:center'>" +
+        "<input type='number' class='input' id='set-" + p.id + "' style='width:72px;padding:5px 8px;font-size:12px' min='0' placeholder='0'>" +
+        "<button class='btn btn-primary btn-sm' onclick='setQty(" + p.id + ")'>تعيين</button>" +
+        "</div></td>" +
+        "</tr>";
+    });
+    document.getElementById("body").innerHTML = html;
+    document.getElementById("empty").style.display = filtered.length ? "none" : "block";
+  }
+
+  async function adj(id, delta) { await changeStock(id, delta); load(); }
+
+  async function setQty(id) {
+    var inp = document.getElementById("set-" + id);
+    var qty = parseInt(inp.value);
+    if (isNaN(qty) || qty < 0) { toast("أدخل كمية صحيحة", "error"); return; }
+    var p = PRODUCTS.find(function (x) { return x.id === id; });
+    if (!p) return;
+    var delta = qty - p.stock;
+    await changeStock(id, delta);
+    toast("تم تعيين المخزون: " + qty, "success");
+    inp.value = "";
+    load();
+  }
+
+  load();
+</script>
+    <script src="js/auto-updater-ui.js"></script>
+</body>
+</html>

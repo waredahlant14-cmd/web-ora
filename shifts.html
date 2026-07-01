@@ -1,0 +1,185 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>الورديات — WeB Ora</title>
+  <link rel="icon" type="image/png" href="img/mark-glow.png">
+  <link rel="stylesheet" href="css/style.css">
+  <script src="config.js"></script>
+  <script src="js/mode-manager.js"></script>
+  <script src="js/supabase.min.js"></script>
+  <script src="js/auth.js"></script>
+  <script src="js/seclog.js"></script>
+  <script src="js/currency.js"></script>
+  <script src="js/db.js"></script>
+  <script src="js/sync_queue.js"></script>
+  <script src="js/notifications.js"></script>
+  <script src="js/initial_sync.js"></script>
+  <script src="js/sync_replay.js"></script>
+    <script src="js/background_sync.js"></script>
+  <script src="js/python_sync_bridge.js"></script>
+  <script src="js/queue.js"></script>
+  <script src="js/online.js"></script>
+  <script src="js/layout.js"></script>
+  <script src="js/nav-extend.js"></script>
+  <script src="js/shifts.js"></script>
+  <style>
+    .shift-banner { border-radius:var(--radius);padding:20px 24px;display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:20px;flex-wrap:wrap }
+    .shift-banner.open  { background:linear-gradient(135deg,#dcfce7,#bbf7d0);border:1.5px solid #86efac }
+    .shift-banner.none  { background:var(--primary-light);border:1.5px solid rgba(var(--primary-rgb),.3) }
+    .shift-banner-info h3 { font-size:16px;font-weight:700;color:#166534;margin-bottom:4px }
+    .shift-banner.none .shift-banner-info h3 { color:var(--primary-dark) }
+    .shift-banner-info p  { font-size:13px;color:#15803d;margin:0 }
+    .shift-banner.none .shift-banner-info p  { color:var(--text-muted) }
+    .shift-stat { text-align:center }
+    .shift-stat .val { font-size:22px;font-weight:800;color:#166534 }
+    .shift-stat .lbl { font-size:11px;color:#15803d;font-weight:600 }
+    .diff-pos { color:var(--green);font-weight:700 }
+    .diff-neg { color:var(--red);font-weight:700 }
+  </style>
+  <script src="js/refresh-btn.js"></script>
+</head>
+<body>
+<div id="page">
+  <div class="page-head">
+    <h1>الورديات</h1>
+    <p>إدارة ورديات العمل وغلق نقطة البيع</p>
+  </div>
+
+  <!-- بانر الوردية الحالية -->
+  <div id="current-shift-banner"></div>
+
+  <!-- Modal فتح وردية -->
+  <div class="modal" id="open-modal">
+    <div class="modal-box" style="max-width:420px">
+      <div class="modal-head">
+        <h3>فتح وردية جديدة</h3>
+        <button class="modal-close" onclick="closeModal('open-modal')">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="field">
+          <label class="label">النقد الافتتاحي في الصندوق</label>
+          <input class="input" id="opening-cash" type="number" min="0" step="0.01" placeholder="0.00" style="font-size:20px;text-align:center;font-weight:700">
+        </div>
+        <p class="text-muted" style="font-size:12px;margin-top:8px">
+          أدخل المبلغ النقدي الموجود في الصندوق عند بدء الوردية.
+        </p>
+      </div>
+      <div class="modal-foot">
+        <button class="btn btn-outline" onclick="closeModal('open-modal')">إلغاء</button>
+        <button class="btn btn-primary" onclick="confirmOpenShift()">فتح الوردية</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- سجل الورديات -->
+  <div class="card">
+    <h2 style="margin-bottom:16px">سجل الورديات</h2>
+    <div class="table-wrap">
+      <table class="table">
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>الموظف</th>
+            <th>فتح</th>
+            <th>غلق</th>
+            <th>النقد الافتتاحي</th>
+            <th>المبيعات</th>
+            <th>الفواتير</th>
+            <th>الفرق</th>
+            <th>الحالة</th>
+          </tr>
+        </thead>
+        <tbody id="shifts-body"></tbody>
+      </table>
+    </div>
+    <div class="empty-state" id="shifts-empty" style="display:none">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+      لا توجد ورديات مسجّلة بعد
+    </div>
+  </div>
+</div>
+
+<script>
+renderLayout("shifts");
+syncOpenShiftFromCloud();
+
+var _openShift = null;
+
+async function load() {
+  _openShift = getOpenShift();
+  renderBanner();
+  var shifts = await getShifts();
+  renderTable(shifts);
+}
+
+function renderBanner() {
+  var el = document.getElementById("current-shift-banner");
+  if (_openShift) {
+    el.innerHTML =
+      '<div class="shift-banner open">'+
+        '<div class="shift-banner-info">'+
+          '<h3>🟢 وردية مفتوحة الآن</h3>'+
+          '<p>'+esc(_openShift.userName)+' — فُتحت '+fmtDateTime(_openShift.openedAt)+'</p>'+
+        '</div>'+
+        '<div style="display:flex;gap:24px;flex-wrap:wrap">'+
+          '<div class="shift-stat"><div class="val">'+formatPrice(_openShift.openingCash)+'</div><div class="lbl">نقد افتتاحي</div></div>'+
+          '<div class="shift-stat"><div class="val">'+formatPrice(_openShift.salesTotal)+'</div><div class="lbl">مبيعات الوردية</div></div>'+
+          '<div class="shift-stat"><div class="val">'+_openShift.salesCount+'</div><div class="lbl">فاتورة</div></div>'+
+        '</div>'+
+        '<a class="btn btn-primary" href="shift-close.html">إغلاق الوردية</a>'+
+      '</div>';
+  } else {
+    el.innerHTML =
+      '<div class="shift-banner none">'+
+        '<div class="shift-banner-info">'+
+          '<h3>لا توجد وردية مفتوحة</h3>'+
+          '<p>ابدأ وردية جديدة لتتبع مبيعاتك وإدارة الصندوق</p>'+
+        '</div>'+
+        '<button class="btn btn-primary" onclick="openModal(\'open-modal\')">فتح وردية جديدة</button>'+
+      '</div>';
+  }
+}
+
+function renderTable(shifts) {
+  var tbody = document.getElementById("shifts-body");
+  var empty = document.getElementById("shifts-empty");
+  if (!shifts.length) { empty.style.display=""; tbody.innerHTML=""; return; }
+  empty.style.display = "none";
+  tbody.innerHTML = shifts.map(function(s, idx) {
+    var diff = s.difference;
+    var diffHtml = s.status==="open" ? '<span class="text-muted">—</span>' :
+      '<span class="'+(diff>=0?'diff-pos':'diff-neg')+'">'+(diff>=0?'فائض ':'عجز ')+formatPrice(Math.abs(diff))+'</span>';
+    return '<tr>'+
+      '<td class="text-muted fw-bold">'+(idx+1)+'</td>'+
+      '<td>'+esc(s.userName)+'</td>'+
+      '<td class="text-muted direction-ltr" style="font-size:12px">'+fmtDateTime(s.openedAt)+'</td>'+
+      '<td class="text-muted direction-ltr" style="font-size:12px">'+(s.closedAt?fmtDateTime(s.closedAt):'—')+'</td>'+
+      '<td>'+formatPrice(s.openingCash)+'</td>'+
+      '<td class="fw-bold text-green">'+formatPrice(s.salesTotal)+'</td>'+
+      '<td>'+s.salesCount+'</td>'+
+      '<td>'+diffHtml+'</td>'+
+      '<td>'+(s.status==="open"?'<span class="badge badge-green">مفتوحة</span>':'<span class="badge">مغلقة</span>')+'</td>'+
+    '</tr>';
+  }).join("");
+}
+
+async function confirmOpenShift() {
+  var cash = parseFloat(document.getElementById("opening-cash").value)||0;
+  var res  = await openShift(cash);
+  if (res.error === "already_open") { toast("يوجد وردية مفتوحة بالفعل","error"); return; }
+  if (res.error) { toast("خطأ: "+res.error,"error"); return; }
+  toast("تم فتح الوردية بنجاح","success");
+  closeModal("open-modal");
+  _openShift = res.shift;
+  renderBanner();
+  var shifts = await getShifts();
+  renderTable(shifts);
+}
+
+load();
+</script>
+    <script src="js/auto-updater-ui.js"></script>
+</body>
+</html>

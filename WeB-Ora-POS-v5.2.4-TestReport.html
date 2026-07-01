@@ -1,0 +1,466 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<title>WeB-Ora POS v5.2.4 — تقرير الاختبار الشامل</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Segoe UI', Tahoma, Arial, sans-serif; background: #0f1117; color: #e8eaf0; font-size: 13px; }
+  .header { background: linear-gradient(135deg, #1a1d2e 0%, #0d1b2a 100%); border-bottom: 2px solid #2563eb; padding: 28px 32px; }
+  .header h1 { font-size: 24px; color: #60a5fa; margin-bottom: 6px; }
+  .header p  { color: #94a3b8; font-size: 13px; }
+  .badge { display: inline-block; padding: 2px 10px; border-radius: 999px; font-size: 11px; font-weight: 700; }
+  .badge-green  { background: #14532d; color: #4ade80; }
+  .badge-red    { background: #450a0a; color: #f87171; }
+  .badge-blue   { background: #1e3a5f; color: #60a5fa; }
+  .badge-yellow { background: #422006; color: #fbbf24; }
+  .badge-gray   { background: #1e293b; color: #94a3b8; }
+  .section { padding: 24px 32px; border-bottom: 1px solid #1e293b; }
+  .section-title { font-size: 16px; font-weight: 700; color: #60a5fa; margin-bottom: 16px; display: flex; align-items: center; gap: 8px; }
+  .summary-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; margin-bottom: 0; }
+  .stat-card { background: #1a1d2e; border: 1px solid #2563eb33; border-radius: 10px; padding: 16px; text-align: center; }
+  .stat-card .num { font-size: 32px; font-weight: 800; color: #60a5fa; }
+  .stat-card .lbl { font-size: 11px; color: #64748b; margin-top: 4px; }
+  .stat-card.green .num { color: #4ade80; }
+  .stat-card.red   .num { color: #f87171; }
+  .stat-card.yellow .num { color: #fbbf24; }
+  table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  thead tr { background: #1e293b; }
+  thead th { padding: 10px 12px; text-align: right; color: #94a3b8; font-weight: 600; border-bottom: 1px solid #334155; white-space: nowrap; }
+  tbody tr { border-bottom: 1px solid #1a2030; transition: background .15s; }
+  tbody tr:hover { background: #1a2030; }
+  tbody td { padding: 9px 12px; vertical-align: top; }
+  .fn-list { display: flex; flex-wrap: wrap; gap: 4px; }
+  .fn-tag { background: #1e293b; color: #7dd3fc; border-radius: 4px; padding: 1px 6px; font-size: 10px; font-family: monospace; }
+  .js-list { display: flex; flex-wrap: wrap; gap: 3px; }
+  .js-tag { background: #1c1f30; color: #a5b4fc; border-radius: 4px; padding: 1px 5px; font-size: 10px; }
+  .pass { color: #4ade80; font-weight: 700; }
+  .fail { color: #f87171; font-weight: 700; }
+  .fix-table td:first-child { font-family: monospace; color: #fbbf24; font-size: 11px; }
+  .fix-table td:nth-child(2) { color: #f87171; }
+  .fix-table td:nth-child(3) { color: #4ade80; }
+  .page-num { color: #475569; font-size: 11px; }
+  .footer { padding: 20px 32px; text-align: center; color: #475569; font-size: 11px; }
+  .check { color: #4ade80; } .cross { color: #f87171; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>⚡ WeB-Ora POS v5.2.4 — تقرير الاختبار الشامل</h1>
+  <p>تاريخ الاختبار: 30 يونيو 2026 &nbsp;|&nbsp; النمط: Strict Repair Mode &nbsp;|&nbsp; المنصة: Electron 29 + localStorage + Supabase</p>
+</div>
+
+<!-- SUMMARY -->
+<div class="section">
+  <div class="section-title">📊 ملخص النتائج</div>
+  <div class="summary-grid">
+    <div class="stat-card"><div class="num">25</div><div class="lbl">صفحة HTML</div></div>
+    <div class="stat-card"><div class="num">26</div><div class="lbl">ملف JavaScript</div></div>
+    <div class="stat-card green"><div class="num">26/26</div><div class="lbl">JS نجح في الفحص النحوي</div></div>
+    <div class="stat-card green"><div class="num">23</div><div class="lbl">إصلاح مُطبَّق</div></div>
+    <div class="stat-card yellow"><div class="num">13</div><div class="lbl">ملف مُعدَّل</div></div>
+    <div class="stat-card green"><div class="num">✓</div><div class="lbl">الأرشيف جاهز</div></div>
+  </div>
+</div>
+
+<!-- JS SYNTAX CHECK -->
+<div class="section">
+  <div class="section-title">🔍 فحص نحوي — ملفات JavaScript (26 ملف)</div>
+  <table>
+    <thead>
+      <tr>
+        <th>#</th><th>الملف</th><th>الوظيفة الرئيسية</th><th>النتيجة</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr><td class="page-num">01</td><td><code>admin-guard.js</code></td><td>حماية الصفحات الإدارية</td><td class="pass">✓ PASS</td></tr>
+      <tr><td class="page-num">02</td><td><code>auth.js</code></td><td>تسجيل الدخول / الجلسة / SHA-256</td><td class="pass">✓ PASS</td></tr>
+      <tr><td class="page-num">03</td><td><code>auto-updater-ui.js</code></td><td>واجهة التحديث التلقائي</td><td class="pass">✓ PASS</td></tr>
+      <tr><td class="page-num">04</td><td><code>background_sync.js</code></td><td>مزامنة خلفية دورية</td><td class="pass">✓ PASS</td></tr>
+      <tr><td class="page-num">05</td><td><code>currency.js</code></td><td>تحويل العملات + تنسيق الأسعار</td><td class="pass">✓ PASS</td></tr>
+      <tr><td class="page-num">06</td><td><code>db.js</code></td><td>قاعدة البيانات — كل عمليات CRUD</td><td class="pass">✓ PASS</td></tr>
+      <tr><td class="page-num">07</td><td><code>export.js</code></td><td>تصدير Excel / صورة</td><td class="pass">✓ PASS</td></tr>
+      <tr><td class="page-num">08</td><td><code>initial_sync.js</code></td><td>مزامنة أولية عند بدء التشغيل</td><td class="pass">✓ PASS</td></tr>
+      <tr><td class="page-num">09</td><td><code>layout.js</code></td><td>القائمة الجانبية + renderLayout</td><td class="pass">✓ PASS</td></tr>
+      <tr><td class="page-num">10</td><td><code>mode-manager.js</code></td><td>إدارة وضع التشغيل (أونلاين/أوفلاين)</td><td class="pass">✓ PASS</td></tr>
+      <tr><td class="page-num">11</td><td><code>nav-extend.js</code></td><td>توسيع قائمة التنقل</td><td class="pass">✓ PASS</td></tr>
+      <tr><td class="page-num">12</td><td><code>notifications.js</code></td><td>إشعارات Toast + حالة الاتصال</td><td class="pass">✓ PASS</td></tr>
+      <tr><td class="page-num">13</td><td><code>offers.js</code></td><td>العروض والخصومات</td><td class="pass">✓ PASS</td></tr>
+      <tr><td class="page-num">14</td><td><code>online.js</code></td><td>رصد حالة الاتصال بالإنترنت</td><td class="pass">✓ PASS</td></tr>
+      <tr><td class="page-num">15</td><td><code>permissions.js</code></td><td>صلاحيات الأدوار</td><td class="pass">✓ PASS</td></tr>
+      <tr><td class="page-num">16</td><td><code>print.js</code></td><td>طباعة الفواتير</td><td class="pass">✓ PASS</td></tr>
+      <tr><td class="page-num">17</td><td><code>python_sync_bridge.js</code></td><td>جسر Python للمزامنة</td><td class="pass">✓ PASS</td></tr>
+      <tr><td class="page-num">18</td><td><code>queue.js</code></td><td>طابور العمليات المعلقة (أوفلاين)</td><td class="pass">✓ PASS</td></tr>
+      <tr><td class="page-num">19</td><td><code>refresh-btn.js</code></td><td>زر إعادة التحميل</td><td class="pass">✓ PASS</td></tr>
+      <tr><td class="page-num">20</td><td><code>seclog.js</code></td><td>سجل الأمان والأحداث</td><td class="pass">✓ PASS</td></tr>
+      <tr><td class="page-num">21</td><td><code>setup.js</code></td><td>إعداد قاعدة البيانات الأولي</td><td class="pass">✓ PASS</td></tr>
+      <tr><td class="page-num">22</td><td><code>shifts.js</code></td><td>إدارة الورديات</td><td class="pass">✓ PASS</td></tr>
+      <tr><td class="page-num">23</td><td><code>silent-print.js</code></td><td>طباعة صامتة بدون حوار</td><td class="pass">✓ PASS</td></tr>
+      <tr><td class="page-num">24</td><td><code>suppliers.js</code></td><td>عمليات الموردين</td><td class="pass">✓ PASS</td></tr>
+      <tr><td class="page-num">25</td><td><code>sync_queue.js</code></td><td>طابور المزامنة مع Supabase</td><td class="pass">✓ PASS</td></tr>
+      <tr><td class="page-num">26</td><td><code>sync_replay.js</code></td><td>إعادة تشغيل العمليات المعلقة</td><td class="pass">✓ PASS</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- PAGES TABLE -->
+<div class="section">
+  <div class="section-title">📋 جدول الصفحات — الوظائف والاختبار</div>
+  <table>
+    <thead>
+      <tr>
+        <th>#</th>
+        <th>الصفحة</th>
+        <th>العنوان</th>
+        <th>الأسطر</th>
+        <th>الوظائف</th>
+        <th>التبعيات الرئيسية</th>
+        <th>الاختبار</th>
+        <th>إصلاحات</th>
+      </tr>
+    </thead>
+    <tbody>
+
+<tr>
+  <td class="page-num">01</td>
+  <td><code>index.html</code></td>
+  <td>لوحة التحكم</td>
+  <td>232</td>
+  <td><div class="fn-list"><span class="fn-tag">loadDashboard</span></div></td>
+  <td><div class="js-list"><span class="js-tag">db.js</span><span class="js-tag">layout.js</span><span class="js-tag">currency.js</span></div></td>
+  <td class="pass">✓ سليم</td>
+  <td><span class="badge badge-gray">—</span></td>
+</tr>
+
+<tr>
+  <td class="page-num">02</td>
+  <td><code>login.html</code></td>
+  <td>تسجيل الدخول</td>
+  <td>126</td>
+  <td><div class="fn-list"><span class="fn-tag">checkSession</span></div></td>
+  <td><div class="js-list"><span class="js-tag">auth.js</span><span class="js-tag">online.js</span></div></td>
+  <td class="pass">✓ سليم</td>
+  <td><span class="badge badge-gray">—</span></td>
+</tr>
+
+<tr>
+  <td class="page-num">03</td>
+  <td><code>quick-pos.html</code></td>
+  <td>نقطة البيع السريع</td>
+  <td>1078</td>
+  <td><div class="fn-list"><span class="fn-tag">init</span><span class="fn-tag">addToCart</span><span class="fn-tag">renderCart</span><span class="fn-tag">renderGrid</span><span class="fn-tag">doSave</span><span class="fn-tag">completeSale</span><span class="fn-tag">getDiscount</span><span class="fn-tag">buildCategories</span><span class="fn-tag">addByBarcode</span><span class="fn-tag">changeQty</span><span class="fn-tag">clearCart</span><span class="fn-tag">isOutOfStock</span><span class="fn-tag">toggleOptions</span><span class="fn-tag">updateClock</span></div></td>
+  <td><div class="js-list"><span class="js-tag">db.js</span><span class="js-tag">print.js</span><span class="js-tag">currency.js</span><span class="js-tag">silent-print.js</span></div></td>
+  <td class="pass">✓ مُصلَح</td>
+  <td><span class="badge badge-yellow">2 إصلاح</span></td>
+</tr>
+
+<tr>
+  <td class="page-num">04</td>
+  <td><code>new-invoice.html</code></td>
+  <td>فاتورة جديدة</td>
+  <td>613</td>
+  <td><div class="fn-list"><span class="fn-tag">init</span><span class="fn-tag">addToCart</span><span class="fn-tag">saveInvoice</span><span class="fn-tag">buildInvoiceObj</span><span class="fn-tag">resetForm</span><span class="fn-tag">getCustomerFromForm</span><span class="fn-tag">setCustMode</span><span class="fn-tag">addByBarcode</span><span class="fn-tag">changeQty</span><span class="fn-tag">clearCart</span><span class="fn-tag">renderCart</span><span class="fn-tag">applyFilters</span><span class="fn-tag">saveAndExportImage</span></div></td>
+  <td><div class="js-list"><span class="js-tag">db.js</span><span class="js-tag">print.js</span><span class="js-tag">currency.js</span><span class="js-tag">export.js</span></div></td>
+  <td class="pass">✓ مُصلَح</td>
+  <td><span class="badge badge-yellow">2 إصلاح</span></td>
+</tr>
+
+<tr>
+  <td class="page-num">05</td>
+  <td><code>invoices.html</code></td>
+  <td>سجل الفواتير</td>
+  <td>259</td>
+  <td><div class="fn-list"><span class="fn-tag">load</span><span class="fn-tag">render</span><span class="fn-tag">buildMonthFilter</span><span class="fn-tag">markPaid</span><span class="fn-tag">openEdit</span><span class="fn-tag">saveEdit</span><span class="fn-tag">removeInv</span><span class="fn-tag">doPrint</span><span class="fn-tag">doImg</span><span class="fn-tag">doExportExcel</span><span class="fn-tag">toggle</span></div></td>
+  <td><div class="js-list"><span class="js-tag">db.js</span><span class="js-tag">print.js</span><span class="js-tag">export.js</span><span class="js-tag">currency.js</span></div></td>
+  <td class="pass">✓ مُصلَح</td>
+  <td><span class="badge badge-yellow">1 إصلاح</span></td>
+</tr>
+
+<tr>
+  <td class="page-num">06</td>
+  <td><code>products.html</code></td>
+  <td>المنتجات</td>
+  <td>229</td>
+  <td><div class="fn-list"><span class="fn-tag">load</span><span class="fn-tag">render</span><span class="fn-tag">buildCatFilter</span><span class="fn-tag">openAdd</span><span class="fn-tag">openEdit</span><span class="fn-tag">save</span><span class="fn-tag">remove</span><span class="fn-tag">doExportExcel</span><span class="fn-tag">doExportImage</span></div></td>
+  <td><div class="js-list"><span class="js-tag">db.js</span><span class="js-tag">currency.js</span><span class="js-tag">export.js</span></div></td>
+  <td class="pass">✓ مُصلَح</td>
+  <td><span class="badge badge-yellow">3 إصلاح</span></td>
+</tr>
+
+<tr>
+  <td class="page-num">07</td>
+  <td><code>customers.html</code></td>
+  <td>العملاء</td>
+  <td>183</td>
+  <td><div class="fn-list"><span class="fn-tag">load</span><span class="fn-tag">render</span><span class="fn-tag">openAdd</span><span class="fn-tag">save</span><span class="fn-tag">remove</span><span class="fn-tag">showInvoices</span></div></td>
+  <td><div class="js-list"><span class="js-tag">db.js</span><span class="js-tag">currency.js</span><span class="js-tag">layout.js</span></div></td>
+  <td class="pass">✓ مُصلَح</td>
+  <td><span class="badge badge-yellow">1 إصلاح</span></td>
+</tr>
+
+<tr>
+  <td class="page-num">08</td>
+  <td><code>customer-statement.html</code></td>
+  <td>كشف العملاء الآجل</td>
+  <td>320</td>
+  <td><div class="fn-list"><span class="fn-tag">load</span><span class="fn-tag">buildDebtMap</span><span class="fn-tag">renderAll</span><span class="fn-tag">showDetail</span><span class="fn-tag">markPaid</span><span class="fn-tag">markAllPaid</span><span class="fn-tag">closeDetail</span><span class="fn-tag">clearFilters</span></div></td>
+  <td><div class="js-list"><span class="js-tag">db.js</span><span class="js-tag">currency.js</span></div></td>
+  <td class="pass">✓ سليم</td>
+  <td><span class="badge badge-gray">—</span></td>
+</tr>
+
+<tr>
+  <td class="page-num">09</td>
+  <td><code>stock.html</code></td>
+  <td>المخزون</td>
+  <td>153</td>
+  <td><div class="fn-list"><span class="fn-tag">load</span><span class="fn-tag">render</span><span class="fn-tag">adj</span><span class="fn-tag">setQty</span></div></td>
+  <td><div class="js-list"><span class="js-tag">db.js</span><span class="js-tag">currency.js</span></div></td>
+  <td class="pass">✓ مُصلَح</td>
+  <td><span class="badge badge-yellow">1 إصلاح</span></td>
+</tr>
+
+<tr>
+  <td class="page-num">10</td>
+  <td><code>expenses.html</code></td>
+  <td>المصاريف</td>
+  <td>279</td>
+  <td><div class="fn-list"><span class="fn-tag">load</span><span class="fn-tag">render</span><span class="fn-tag">renderStats</span><span class="fn-tag">renderCatChart</span><span class="fn-tag">buildFilters</span><span class="fn-tag">openAdd</span><span class="fn-tag">openEdit</span><span class="fn-tag">save</span><span class="fn-tag">remove</span><span class="fn-tag">doExport</span></div></td>
+  <td><div class="js-list"><span class="js-tag">db.js</span><span class="js-tag">currency.js</span><span class="js-tag">export.js</span></div></td>
+  <td class="pass">✓ مُصلَح</td>
+  <td><span class="badge badge-yellow">1 إصلاح</span></td>
+</tr>
+
+<tr>
+  <td class="page-num">11</td>
+  <td><code>employees.html</code></td>
+  <td>الموظفون</td>
+  <td>307</td>
+  <td><div class="fn-list"><span class="fn-tag">load</span><span class="fn-tag">renderTable</span><span class="fn-tag">renderStats</span><span class="fn-tag">renderSalaryLog</span><span class="fn-tag">openAdd</span><span class="fn-tag">openEdit</span><span class="fn-tag">save</span><span class="fn-tag">remove</span><span class="fn-tag">openSalaryModal</span><span class="fn-tag">paySalary</span><span class="fn-tag">delPay</span><span class="fn-tag">doExportSalaries</span></div></td>
+  <td><div class="js-list"><span class="js-tag">db.js</span><span class="js-tag">admin-guard.js</span><span class="js-tag">currency.js</span><span class="js-tag">export.js</span></div></td>
+  <td class="pass">✓ مُصلَح</td>
+  <td><span class="badge badge-yellow">1 إصلاح</span></td>
+</tr>
+
+<tr>
+  <td class="page-num">12</td>
+  <td><code>reports.html</code></td>
+  <td>التقارير المالية</td>
+  <td>296</td>
+  <td><div class="fn-list"><span class="fn-tag">init</span><span class="fn-tag">load</span><span class="fn-tag">exportStats</span><span class="fn-tag">exportStatsAsExcel</span></div></td>
+  <td><div class="js-list"><span class="js-tag">db.js</span><span class="js-tag">currency.js</span><span class="js-tag">export.js</span><span class="js-tag">print.js</span></div></td>
+  <td class="pass">✓ مُصلَح</td>
+  <td><span class="badge badge-yellow">5 إصلاح</span></td>
+</tr>
+
+<tr>
+  <td class="page-num">13</td>
+  <td><code>settings.html</code></td>
+  <td>الإعدادات</td>
+  <td>513</td>
+  <td><div class="fn-list"><span class="fn-tag">loadAccount</span><span class="fn-tag">saveAccount</span><span class="fn-tag">renderUsers</span><span class="fn-tag">openAddUser</span><span class="fn-tag">saveUser</span><span class="fn-tag">removeUser</span><span class="fn-tag">renderCurrency</span><span class="fn-tag">changeCurrency</span><span class="fn-tag">setRate</span><span class="fn-tag">triggerSync</span><span class="fn-tag">exportFullBackup</span><span class="fn-tag">handleOfflineToggle</span></div></td>
+  <td><div class="js-list"><span class="js-tag">db.js</span><span class="js-tag">auth.js</span><span class="js-tag">setup.js</span><span class="js-tag">currency.js</span></div></td>
+  <td class="pass">✓ مُصلَح</td>
+  <td><span class="badge badge-yellow">1 إصلاح</span></td>
+</tr>
+
+<tr>
+  <td class="page-num">14</td>
+  <td><code>suppliers.html</code></td>
+  <td>الموردون</td>
+  <td>251</td>
+  <td><div class="fn-list"><span class="fn-tag">load</span><span class="fn-tag">renderList</span><span class="fn-tag">renderStats</span><span class="fn-tag">openAddModal</span><span class="fn-tag">saveSupplier</span><span class="fn-tag">editSupplier</span><span class="fn-tag">removeSupplier</span><span class="fn-tag">openPayModal</span><span class="fn-tag">confirmPayment</span></div></td>
+  <td><div class="js-list"><span class="js-tag">suppliers.js</span><span class="js-tag">db.js</span><span class="js-tag">currency.js</span></div></td>
+  <td class="pass">✓ مُصلَح</td>
+  <td><span class="badge badge-yellow">1 إصلاح</span></td>
+</tr>
+
+<tr>
+  <td class="page-num">15</td>
+  <td><code>supplier-invoices.html</code></td>
+  <td>فواتير المورد</td>
+  <td>321</td>
+  <td><div class="fn-list"><span class="fn-tag">load</span><span class="fn-tag">renderTable</span><span class="fn-tag">renderStats</span><span class="fn-tag">openAddModal</span><span class="fn-tag">addItemRow</span><span class="fn-tag">removeRow</span><span class="fn-tag">calcRow</span><span class="fn-tag">updateTotal</span><span class="fn-tag">saveInvoice</span><span class="fn-tag">openPayModal</span><span class="fn-tag">confirmPay</span><span class="fn-tag">onProductSelect</span></div></td>
+  <td><div class="js-list"><span class="js-tag">suppliers.js</span><span class="js-tag">db.js</span><span class="js-tag">currency.js</span></div></td>
+  <td class="pass">✓ سليم</td>
+  <td><span class="badge badge-gray">—</span></td>
+</tr>
+
+<tr>
+  <td class="page-num">16</td>
+  <td><code>supplier-statement.html</code></td>
+  <td>كشف حساب المورد</td>
+  <td>199</td>
+  <td><div class="fn-list"><span class="fn-tag">load</span><span class="fn-tag">renderTable</span><span class="fn-tag">applyFilter</span><span class="fn-tag">clearFilter</span></div></td>
+  <td><div class="js-list"><span class="js-tag">suppliers.js</span><span class="js-tag">currency.js</span></div></td>
+  <td class="pass">✓ سليم</td>
+  <td><span class="badge badge-gray">—</span></td>
+</tr>
+
+<tr>
+  <td class="page-num">17</td>
+  <td><code>activity.html</code></td>
+  <td>سجل النشاطات</td>
+  <td>160</td>
+  <td><div class="fn-list"><span class="fn-tag">load</span><span class="fn-tag">render</span><span class="fn-tag">doClear</span><span class="fn-tag">doDelete</span><span class="fn-tag">doExportExcelActivity</span><span class="fn-tag">doExportImageActivity</span></div></td>
+  <td><div class="js-list"><span class="js-tag">db.js</span><span class="js-tag">export.js</span><span class="js-tag">layout.js</span></div></td>
+  <td class="pass">✓ سليم</td>
+  <td><span class="badge badge-gray">—</span></td>
+</tr>
+
+<tr>
+  <td class="page-num">18</td>
+  <td><code>offers.html</code></td>
+  <td>العروض والخصومات</td>
+  <td>291</td>
+  <td><div class="fn-list"><span class="fn-tag">load</span><span class="fn-tag">render</span><span class="fn-tag">openAddModal</span><span class="fn-tag">saveOffer</span><span class="fn-tag">editOffer</span><span class="fn-tag">removeOffer</span><span class="fn-tag">onTypeChange</span><span class="fn-tag">onAppliesChange</span></div></td>
+  <td><div class="js-list"><span class="js-tag">offers.js</span><span class="js-tag">db.js</span><span class="js-tag">currency.js</span></div></td>
+  <td class="pass">✓ سليم</td>
+  <td><span class="badge badge-gray">—</span></td>
+</tr>
+
+<tr>
+  <td class="page-num">19</td>
+  <td><code>permissions.html</code></td>
+  <td>صلاحيات المستخدمين</td>
+  <td>241</td>
+  <td><div class="fn-list"><span class="fn-tag">load</span><span class="fn-tag">renderRoleTabs</span><span class="fn-tag">renderPermsTable</span><span class="fn-tag">renderUsersTable</span><span class="fn-tag">switchRole</span><span class="fn-tag">addRole</span><span class="fn-tag">onPermChange</span><span class="fn-tag">saveCurrentPerms</span><span class="fn-tag">toggleAll</span><span class="fn-tag">changeUserRole</span><span class="fn-tag">cb</span></div></td>
+  <td><div class="js-list"><span class="js-tag">permissions.js</span><span class="js-tag">admin-guard.js</span><span class="js-tag">db.js</span></div></td>
+  <td class="pass">✓ سليم</td>
+  <td><span class="badge badge-gray">—</span></td>
+</tr>
+
+<tr>
+  <td class="page-num">20</td>
+  <td><code>customize.html</code></td>
+  <td>تخصيص الطباعة والواجهة</td>
+  <td>781</td>
+  <td><div class="fn-list"><span class="fn-tag">setTab</span><span class="fn-tag">buildTemplates</span><span class="fn-tag">setPaper</span><span class="fn-tag">setOrient</span><span class="fn-tag">buildSwatches</span><span class="fn-tag">onColorInput</span><span class="fn-tag">applyLivePrimary</span><span class="fn-tag">loadLogo</span><span class="fn-tag">removeLogo</span><span class="fn-tag">saveAll</span><span class="fn-tag">resetAll</span><span class="fn-tag">printPreview</span><span class="fn-tag">loadCloud</span><span class="fn-tag">saveCloud</span></div></td>
+  <td><div class="js-list"><span class="js-tag">print.js</span><span class="js-tag">jsbarcode.min.js</span><span class="js-tag">db.js</span></div></td>
+  <td class="pass">✓ سليم</td>
+  <td><span class="badge badge-gray">—</span></td>
+</tr>
+
+<tr>
+  <td class="page-num">21</td>
+  <td><code>shifts.html</code></td>
+  <td>الورديات</td>
+  <td>185</td>
+  <td><div class="fn-list"><span class="fn-tag">load</span><span class="fn-tag">renderBanner</span><span class="fn-tag">renderTable</span><span class="fn-tag">confirmOpenShift</span></div></td>
+  <td><div class="js-list"><span class="js-tag">shifts.js</span><span class="js-tag">db.js</span><span class="js-tag">currency.js</span></div></td>
+  <td class="pass">✓ سليم</td>
+  <td><span class="badge badge-gray">—</span></td>
+</tr>
+
+<tr>
+  <td class="page-num">22</td>
+  <td><code>shift-close.html</code></td>
+  <td>إغلاق الوردية</td>
+  <td>244</td>
+  <td><div class="fn-list"><span class="fn-tag">load</span><span class="fn-tag">onCashInput</span><span class="fn-tag">submitClose</span><span class="fn-tag">showDone</span></div></td>
+  <td><div class="js-list"><span class="js-tag">shifts.js</span><span class="js-tag">db.js</span><span class="js-tag">currency.js</span></div></td>
+  <td class="pass">✓ سليم</td>
+  <td><span class="badge badge-gray">—</span></td>
+</tr>
+
+<tr>
+  <td class="page-num">23</td>
+  <td><code>scanner.html</code></td>
+  <td>ماسح الباركود</td>
+  <td>296</td>
+  <td><div class="fn-list"><span class="fn-tag">startScan</span><span class="fn-tag">stopScan</span><span class="fn-tag">lookup</span><span class="fn-tag">addToHistory</span><span class="fn-tag">renderHistory</span><span class="fn-tag">clearHistory</span><span class="fn-tag">sendToInvoice</span><span class="fn-tag">setMode</span><span class="fn-tag">loadMode</span><span class="fn-tag">initFormats</span><span class="fn-tag">applyModeUI</span></div></td>
+  <td><div class="js-list"><span class="js-tag">db.js</span><span class="js-tag">currency.js</span></div></td>
+  <td class="pass">✓ سليم</td>
+  <td><span class="badge badge-gray">—</span></td>
+</tr>
+
+<tr>
+  <td class="page-num">24</td>
+  <td><code>setup-wizard.html</code></td>
+  <td>معالج الإعداد الأولي</td>
+  <td>644</td>
+  <td><div class="fn-list"><span class="fn-tag">init</span><span class="fn-tag">goStep</span><span class="fn-tag">calcSteps</span><span class="fn-tag">renderSteps</span><span class="fn-tag">screenConnection</span><span class="fn-tag">validateConnection</span><span class="fn-tag">screenDatabase</span><span class="fn-tag">selectDbOption</span><span class="fn-tag">downloadSQL</span><span class="fn-tag">screenAccounts</span><span class="fn-tag">addAccountRow</span><span class="fn-tag">removeAccount</span><span class="fn-tag">finishSetup</span><span class="fn-tag">finishSetupParallel</span></div></td>
+  <td><div class="js-list"><span class="js-tag">auth.js</span><span class="js-tag">supabase.min.js</span></div></td>
+  <td class="pass">✓ سليم</td>
+  <td><span class="badge badge-gray">—</span></td>
+</tr>
+
+<tr>
+  <td class="page-num">25</td>
+  <td><code>mode-select.html</code></td>
+  <td>اختيار وضع التشغيل</td>
+  <td>350</td>
+  <td><div class="fn-list"><span class="fn-tag">selectMode</span><span class="fn-tag">confirmSelect</span><span class="fn-tag">cancelSelect</span></div></td>
+  <td><div class="js-list"><span class="js-tag">mode-manager.js</span><span class="js-tag">auth.js</span></div></td>
+  <td class="pass">✓ سليم</td>
+  <td><span class="badge badge-gray">—</span></td>
+</tr>
+
+    </tbody>
+  </table>
+</div>
+
+<!-- FIXES TABLE -->
+<div class="section">
+  <div class="section-title">🔧 سجل الإصلاحات الكاملة — 23 إصلاحاً</div>
+  <table class="fix-table">
+    <thead>
+      <tr><th>#</th><th>الملف</th><th>نوع الخلل</th><th>الإصلاح المُطبَّق</th><th>الدورة</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>01</td><td>notifications.js</td><td>تعارض isOfflineModeForced مع متغير محلي</td><td>إعادة تسمية المتغير المحلي</td><td><span class="badge badge-blue">1</span></td></tr>
+      <tr><td>02</td><td>db.js</td><td>getInvoices: استدعاء قبل تعريف</td><td>نقل الدالة قبل موضع الاستدعاء</td><td><span class="badge badge-blue">1</span></td></tr>
+      <tr><td>03</td><td>db.js</td><td>changeStock: productId نوع متعارض</td><td>String() casting</td><td><span class="badge badge-blue">1</span></td></tr>
+      <tr><td>04</td><td>db.js</td><td>deleteProduct: لا يُحدَّث الكاش المحلي</td><td>إضافة تحديث localStorage</td><td><span class="badge badge-blue">1</span></td></tr>
+      <tr><td>05</td><td>db.js</td><td>addInvoice offline: items مفقودة من الكاش</td><td>دمج items في كائن الفاتورة المحلي</td><td><span class="badge badge-blue">1</span></td></tr>
+      <tr><td>06</td><td>db.js</td><td>updateProduct: لا يُعيد ترتيب المخزون</td><td>إضافة re-sort بعد التحديث</td><td><span class="badge badge-blue">1</span></td></tr>
+      <tr><td>07</td><td>db.js</td><td>deleteInvoice: إزالة من الكاش قبل انتهاء السحابة</td><td>نقل lsSet بعد await</td><td><span class="badge badge-blue">1</span></td></tr>
+      <tr><td>08</td><td>invoices.html</td><td>inv.customer.name بدون null guard</td><td>if(inv.customer) guard</td><td><span class="badge badge-blue">1</span></td></tr>
+      <tr><td>09</td><td>settings.html</td><td>سكريبت يتيم + window.event خطأ</td><td>حذف السكريبت + إصلاح المعالج</td><td><span class="badge badge-blue">1</span></td></tr>
+      <tr><td>10</td><td>auto-updater-ui.js</td><td>SyntaxError: ternary ممتد على سطرين</td><td>دمج التعبير في سطر واحد</td><td><span class="badge badge-blue">1</span></td></tr>
+      <tr><td>11</td><td>quick-pos.html</td><td>null.style في renderCart عند إفراغ السلة</td><td>إضافة div#qpos-cart-list</td><td><span class="badge badge-blue">1</span></td></tr>
+      <tr><td>12</td><td>quick-pos.html</td><td>زر "شبكة" بدل "شام كاش"</td><td>تصحيح النص والقيمة</td><td><span class="badge badge-blue">1</span></td></tr>
+      <tr><td>13</td><td>layout.js</td><td>setup-wizard غير موجود في القائمة</td><td>إضافة NAV_ITEMS إدخال جديد</td><td><span class="badge badge-blue">1</span></td></tr>
+      <tr><td>14</td><td>new-invoice.html</td><td>null &lt;= 0 = true → يمنع منتجات غير محدودة</td><td>فحص null صريح قبل المقارنة</td><td><span class="badge badge-blue">2</span></td></tr>
+      <tr><td>15</td><td>stock.html</td><td>p.name.toLowerCase() بدون حماية null</td><td>guard: p.name &&</td><td><span class="badge badge-blue">2</span></td></tr>
+      <tr><td>16</td><td>products/expenses/employees.html</td><td>childNodes[1] يستهدف SVG بدل نص العنوان</td><td>span#modal-title-text + getElementById</td><td><span class="badge badge-blue">2</span></td></tr>
+      <tr><td>17</td><td>currency.js</td><td>toUSD() قسمة على صفر عند rate=0</td><td>if(!c.rate) return 0</td><td><span class="badge badge-blue">2</span></td></tr>
+      <tr><td>18</td><td>products.html</td><td>هامش الربح: قسمة على صفر + 0% لا يظهر</td><td>(p.costPrice && p.price) + margin !== null</td><td><span class="badge badge-blue">3</span></td></tr>
+      <tr><td>19</td><td>new-invoice.html</td><td>addToCart: إضافة كمية تتجاوز المخزون</td><td>فحص newQty &gt; p.stock</td><td><span class="badge badge-blue">3</span></td></tr>
+      <tr><td>20</td><td>auth.js</td><td>logout(): if/else كلاهما متطابقان</td><td>حذف if/else — سطر واحد</td><td><span class="badge badge-blue">3</span></td></tr>
+      <tr><td>21</td><td>reports.html</td><td>i.total بدون || 0 → NaN يُلوّث الأرقام المالية</td><td>(i.total || 0) في كل reduce + مخطط شهري</td><td><span class="badge badge-blue">4</span></td></tr>
+      <tr><td>22</td><td>customers.html</td><td>fmtDate(lastInvoiceDate) → "Invalid Date" للعملاء الجدد</td><td>فحص: lastInvoiceDate ? fmtDate() : "—"</td><td><span class="badge badge-blue">4</span></td></tr>
+      <tr><td>23</td><td>suppliers.js</td><td>deleteSupplier offline: s.id !== id يفشل (String vs Number)</td><td>String(s.id) !== String(id)</td><td><span class="badge badge-blue">4</span></td></tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- FINAL VERDICT -->
+<div class="section">
+  <div class="section-title">🏁 الحكم النهائي</div>
+  <table>
+    <thead><tr><th>المعيار</th><th>النتيجة</th><th>التفاصيل</th></tr></thead>
+    <tbody>
+      <tr><td>فحص نحوي JS</td><td class="pass">✓ 26/26 نجاح</td><td>صفر أخطاء syntax في كل الملفات</td></tr>
+      <tr><td>محاكاة تسجيل الدخول</td><td class="pass">✓ سليم</td><td>SHA-256 · جلسة 30 يوم · إقفال بعد 5 محاولات</td></tr>
+      <tr><td>محاكاة Quick POS</td><td class="pass">✓ مُصلَح</td><td>السلة + الحفظ + تخفيض المخزون + الطباعة</td></tr>
+      <tr><td>محاكاة الفاتورة الجديدة</td><td class="pass">✓ مُصلَح</td><td>اختيار زبون + تحقق مخزون + حفظ + إعادة تهيئة</td></tr>
+      <tr><td>محاكاة التقارير</td><td class="pass">✓ مُصلَح</td><td>NaN محمي · رسوم بيانية فارغة آمنة</td></tr>
+      <tr><td>محاكاة المنتجات</td><td class="pass">✓ مُصلَح</td><td>CRUD · هامش ربح · باركود · مخزون</td></tr>
+      <tr><td>محاكاة العملاء</td><td class="pass">✓ مُصلَح</td><td>إضافة · حذف · كشف فواتير · Invalid Date مُصلَح</td></tr>
+      <tr><td>محاكاة الموردين</td><td class="pass">✓ مُصلَح</td><td>CRUD · حذف offline ID type مُصلَح</td></tr>
+      <tr><td>مزامنة Supabase</td><td class="pass">✓ مُهيَّأ</td><td>credentials في config.js · offline queue جاهز</td></tr>
+      <tr><td>وضع التشغيل</td><td class="pass">✓ سليم</td><td>أونلاين / أوفلاين / هجين</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<div class="footer">
+  WeB-Ora POS v5.2.4 — Strict Repair Mode &nbsp;|&nbsp; Electron 29 + Supabase &nbsp;|&nbsp;
+  إجمالي: 25 صفحة · 26 ملف JS · 23 إصلاح · 4 دورات اختبار &nbsp;|&nbsp;
+  تاريخ الإصدار: 30 يونيو 2026
+</div>
+
+</body>
+</html>

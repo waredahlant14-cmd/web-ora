@@ -1,0 +1,296 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>التقارير — WeB Ora</title>
+  <link rel="icon" type="image/png" href="img/mark.png">
+  <link rel="stylesheet" href="css/style.css">
+  <script src="config.js"></script>
+  <script src="js/mode-manager.js"></script>
+  <script src="js/supabase.min.js"></script>
+  <script src="js/auth.js"></script>
+  <script src="js/seclog.js"></script>
+  <script src="js/currency.js"></script>
+  <script src="js/db.js"></script>
+  <script src="js/sync_queue.js"></script>
+  <script src="js/notifications.js"></script>
+  <script src="js/initial_sync.js"></script>
+  <script src="js/sync_replay.js"></script>
+    <script src="js/background_sync.js"></script>
+  <script src="js/python_sync_bridge.js"></script>
+  <script src="js/queue.js"></script>
+  <script src="js/online.js"></script>
+  <script src="js/layout.js"></script>
+  <script src="js/nav-extend.js"></script>
+  <script src="js/print.js"></script>
+  <script src="js/export.js"></script>
+  <script src="js/refresh-btn.js"></script>
+</head>
+<body>
+<div id="page">
+  <div class="page-head-row">
+    <div>
+      <h1>التقارير والإحصائيات</h1>
+      <p>تحليل مالي شامل</p>
+    </div>
+    <div class="btn-group">
+      <select class="input" id="report-month" onchange="load()">
+        <option value="">الشهر الحالي</option>
+      </select>
+      <button class="btn btn-outline" onclick="exportStats()">
+        <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+        تصدير صورة
+      </button>
+      <button class="btn btn-outline" onclick="exportStatsAsExcel()">
+        <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+        تصدير Excel
+      </button>
+    </div>
+  </div>
+
+  <!-- كتلة قابلة للتصدير -->
+  <div id="stats-export-area">
+
+  <!-- ملخص مالي -->
+  <div class="stats-grid">
+    <div class="stat-card green"><div class="label">إجمالي المبيعات</div><div class="value" id="r-sales">—</div><div class="sub" id="r-sales-count">—</div></div>
+    <div class="stat-card"><div class="label">تكلفة البضاعة</div><div class="value" id="r-cogs">—</div></div>
+    <div class="stat-card orange"><div class="label">إجمالي الربح</div><div class="value" id="r-gross">—</div><div class="sub">قبل المصاريف</div></div>
+    <div class="stat-card red"><div class="label">المصاريف التشغيلية</div><div class="value" id="r-exp">—</div></div>
+    <div class="stat-card red"><div class="label">الرواتب المدفوعة</div><div class="value" id="r-sal">—</div></div>
+    <div class="stat-card blue"><div class="label">صافي الربح</div><div class="value" id="r-net">—</div></div>
+  </div>
+
+  <!-- مبيعات الأشهر الستة الأخيرة -->
+  <div class="card">
+    <div class="flex-between" style="margin-bottom:14px">
+      <h2 style="margin-bottom:0">
+        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+        المبيعات الشهرية (6 أشهر)
+      </h2>
+    </div>
+    <div class="bars" id="monthly-chart"></div>
+  </div>
+
+  <!-- الصفين: أعلى المنتجات + أعلى العملاء -->
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px">
+    <div class="card mb-0">
+      <h2>
+        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="16.5" y1="9.4" x2="7.5" y2="4.21"/><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>
+        أعلى المنتجات مبيعاً
+      </h2>
+      <div id="top-products"></div>
+    </div>
+    <div class="card mb-0">
+      <h2>
+        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
+        أفضل العملاء
+      </h2>
+      <div id="top-customers"></div>
+    </div>
+  </div>
+
+  <!-- مقارنة: مبيعات مقابل مصاريف ورواتب -->
+  <div class="card">
+    <h2>
+      <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+      مقارنة مالية (6 أشهر)
+    </h2>
+    <div id="comparison-chart"></div>
+  </div>
+
+  </div><!-- end stats-export-area -->
+</div>
+
+<script>
+  renderLayout("reports");
+
+  var ALL_INVOICES = [], ALL_EXPENSES = [], ALL_SALARIES = [], ALL_CUSTOMERS = [];
+
+  async function init() {
+    /* ملء قائمة الأشهر */
+    var inv = await getInvoices();
+    var months = {};
+    inv.forEach(function (i) { var m = (i.date || "").slice(0, 7); if (m) months[m] = true; });
+    var sel = document.getElementById("report-month");
+    Object.keys(months).sort().reverse().forEach(function (m) {
+      var opt = document.createElement("option");
+      opt.value = m;
+      opt.textContent = new Date(m + "-01").toLocaleDateString("ar", { year: "numeric", month: "long" });
+      sel.appendChild(opt);
+    });
+    await load();
+  }
+
+  async function load() {
+    ALL_INVOICES  = await getInvoices();
+    ALL_EXPENSES  = await getExpenses();
+    ALL_SALARIES  = await getSalaryPayments();
+    ALL_CUSTOMERS = await getCustomers();
+
+    var selMonth = document.getElementById("report-month").value || new Date().toISOString().slice(0, 7);
+
+    /* مرشح الشهر */
+    var inv  = ALL_INVOICES.filter(function (i) { return (i.date || "").slice(0, 7) === selMonth; });
+    var exps = ALL_EXPENSES.filter(function (e) { return (e.date || "").slice(0, 7) === selMonth; });
+    var sals = ALL_SALARIES.filter(function (s) { return (s.date || "").slice(0, 7) === selMonth; });
+
+    var sales = inv.reduce(function (s, i) { return s + (i.total || 0); }, 0);
+    var cogs  = inv.reduce(function (s, i) {
+      return s + (i.items || []).reduce(function (ss, it) { return ss + (it.costPrice || 0) * (it.quantity || 0); }, 0);
+    }, 0);
+    var gross   = sales - cogs;
+    var expTotal = exps.reduce(function (s, e) { return s + (e.amount || 0); }, 0);
+    var salTotal = sals.reduce(function (s, p) { return s + (p.amount || 0); }, 0);
+    var net      = gross - expTotal - salTotal;
+
+    document.getElementById("r-sales").textContent       = formatPrice(sales);
+    document.getElementById("r-sales-count").textContent = inv.length + " فاتورة";
+    document.getElementById("r-cogs").textContent        = formatPrice(cogs);
+    document.getElementById("r-gross").textContent       = formatPrice(gross);
+    document.getElementById("r-exp").textContent         = formatPrice(expTotal);
+    document.getElementById("r-sal").textContent         = formatPrice(salTotal);
+    var netEl = document.getElementById("r-net");
+    netEl.textContent = formatPrice(net);
+    netEl.style.color = net >= 0 ? "var(--green)" : "var(--red)";
+
+    /* الرسم البياني الشهري */
+    var months6 = [], labels6 = [], salesM = [], maxV = 1;
+    for (var i = 5; i >= 0; i--) {
+      var d = new Date(); d.setDate(1); d.setMonth(d.getMonth() - i);
+      var key = d.toISOString().slice(0, 7);
+      var s = ALL_INVOICES.filter(function (x) { return (x.date || "").slice(0, 7) === key; })
+        .reduce(function (s, x) { return s + (x.total || 0); }, 0);
+      months6.push(key);
+      labels6.push(d.toLocaleDateString("ar", { month: "short", year: "2-digit" }));
+      salesM.push(s);
+      if (s > maxV) maxV = s;
+    }
+    var ch = "";
+    for (var j = 0; j < 6; j++) {
+      var h = Math.max(4, Math.round((salesM[j] / maxV) * 110));
+      ch += '<div class="bar-col" title="' + formatPrice(salesM[j]) + '">' +
+        '<div class="bar-value" style="font-size:9px">' + (salesM[j] > 0 ? formatPrice(salesM[j]) : "") + '</div>' +
+        '<div class="bar" style="height:' + h + '%;background:' + (months6[j] === selMonth ? "var(--primary)" : "var(--border-2)") + '"></div>' +
+        '<div class="bar-label">' + labels6[j] + '</div></div>';
+    }
+    document.getElementById("monthly-chart").innerHTML = ch;
+
+    /* أعلى منتجات مبيعاً */
+    var prodMap = {};
+    ALL_INVOICES.filter(function (i) { return (i.date || "").slice(0, 7) === selMonth; }).forEach(function (i) {
+      (i.items || []).forEach(function (it) {
+        if (!prodMap[it.name]) prodMap[it.name] = { qty: 0, revenue: 0 };
+        prodMap[it.name].qty += (it.quantity || 0);
+        prodMap[it.name].revenue += (it.total || 0);
+      });
+    });
+    var topProds = Object.entries(prodMap).sort(function (a, b) { return b[1].revenue - a[1].revenue; }).slice(0, 5);
+    var maxProd = topProds.length ? topProds[0][1].revenue : 1;
+    var prodHtml = topProds.length ? "" : '<div class="text-muted" style="font-size:13px">لا توجد مبيعات لهذا الشهر</div>';
+    topProds.forEach(function (e) {
+      prodHtml += '<div class="hbar-row">' +
+        '<div class="hbar-label" style="min-width:100px">' + esc(e[0]) + '</div>' +
+        '<div class="hbar-track"><div class="hbar-fill" style="width:' + Math.round(e[1].revenue/maxProd*100) + '%"></div></div>' +
+        '<div class="hbar-value" style="min-width:100px">' + formatPrice(e[1].revenue) + '</div></div>';
+    });
+    document.getElementById("top-products").innerHTML = prodHtml;
+
+    /* أفضل العملاء */
+    var topCusts = ALL_CUSTOMERS.sort(function (a, b) { return (b.totalSpent || 0) - (a.totalSpent || 0); }).slice(0, 5);
+    var maxCust = topCusts.length ? (topCusts[0].totalSpent || 1) : 1;
+    var custHtml = topCusts.length ? "" : '<div class="text-muted" style="font-size:13px">لا يوجد عملاء بعد</div>';
+    topCusts.forEach(function (c) {
+      custHtml += '<div class="hbar-row">' +
+        '<div class="hbar-label" style="min-width:100px">' + esc(c.name || c.phone) + '</div>' +
+        '<div class="hbar-track"><div class="hbar-fill green" style="width:' + Math.round((c.totalSpent||0)/maxCust*100) + '%"></div></div>' +
+        '<div class="hbar-value" style="min-width:100px">' + formatPrice(c.totalSpent || 0) + '</div></div>';
+    });
+    document.getElementById("top-customers").innerHTML = custHtml;
+
+    /* مقارنة مالية */
+    var compHtml = "";
+    for (var k = 0; k < 6; k++) {
+      var mk = months6[k];
+      var sv = salesM[k];
+      var ev = ALL_EXPENSES.filter(function (e) { return (e.date || "").slice(0, 7) === mk; })
+        .reduce(function (s, e) { return s + e.amount; }, 0);
+      var sv2 = ALL_SALARIES.filter(function (s) { return (s.date || "").slice(0, 7) === mk; })
+        .reduce(function (s, p) { return s + p.amount; }, 0);
+      compHtml += '<div class="flex-between" style="margin-bottom:8px;flex-wrap:wrap;gap:4px">' +
+        '<span style="min-width:80px;font-size:12px;font-weight:700">' + labels6[k] + '</span>' +
+        '<div style="flex:1;display:flex;flex-direction:column;gap:3px">' +
+        '<div class="hbar-row" style="margin-bottom:0"><span style="min-width:50px;font-size:11px;color:var(--text-muted)">مبيعات</span><div class="hbar-track"><div class="hbar-fill" style="width:' + Math.round(sv/Math.max(sv,ev,sv2,1)*100) + '%"></div></div><span style="min-width:70px;font-size:11px;font-weight:700">' + formatPrice(sv) + '</span></div>' +
+        '<div class="hbar-row" style="margin-bottom:0"><span style="min-width:50px;font-size:11px;color:var(--text-muted)">مصاريف</span><div class="hbar-track"><div class="hbar-fill red" style="width:' + Math.round(ev/Math.max(sv,ev,sv2,1)*100) + '%"></div></div><span style="min-width:70px;font-size:11px;font-weight:700">' + formatPrice(ev) + '</span></div>' +
+        '<div class="hbar-row" style="margin-bottom:0"><span style="min-width:50px;font-size:11px;color:var(--text-muted)">رواتب</span><div class="hbar-track"><div class="hbar-fill" style="width:' + Math.round(sv2/Math.max(sv,ev,sv2,1)*100) + '%;background:var(--yellow)"></div></div><span style="min-width:70px;font-size:11px;font-weight:700">' + formatPrice(sv2) + '</span></div>' +
+        '</div></div>';
+    }
+    document.getElementById("comparison-chart").innerHTML = compHtml;
+  }
+
+  function exportStats() {
+    exportElementAsImage("stats-export-area", "تقارير-webora-" + new Date().toISOString().slice(0, 10));
+  }
+
+  async function exportStatsAsExcel() {
+    var selMonth = document.getElementById("report-month").value || new Date().toISOString().slice(0, 7);
+    var inv  = ALL_INVOICES.filter(function (i) { return (i.date || "").slice(0, 7) === selMonth; });
+    var exps = ALL_EXPENSES.filter(function (e) { return (e.date || "").slice(0, 7) === selMonth; });
+    var sals = ALL_SALARIES.filter(function (s) { return (s.date || "").slice(0, 7) === selMonth; });
+
+    var sales = inv.reduce(function (s, i) { return s + i.total; }, 0);
+    var cogs  = inv.reduce(function (s, i) {
+      return s + (i.items || []).reduce(function (ss, it) { return ss + (it.costPrice || 0) * it.quantity; }, 0);
+    }, 0);
+    var expTotal = exps.reduce(function (s, e) { return s + e.amount; }, 0);
+    var salTotal = sals.reduce(function (s, p) { return s + p.amount; }, 0);
+
+    /* أعلى منتجات */
+    var prodMap = {};
+    inv.forEach(function (i) {
+      (i.items || []).forEach(function (it) {
+        if (!prodMap[it.name]) prodMap[it.name] = { qty: 0, revenue: 0 };
+        prodMap[it.name].qty += (it.quantity || 0);
+        prodMap[it.name].revenue += (it.total || 0);
+      });
+    });
+    var topProducts = Object.entries(prodMap)
+      .sort(function (a, b) { return b[1].revenue - a[1].revenue; })
+      .slice(0, 10)
+      .map(function(e){ return {name:e[0], revenue:e[1].revenue, qty:e[1].qty}; });
+
+    var topCustomers = ALL_CUSTOMERS
+      .sort(function (a, b) { return (b.totalSpent || 0) - (a.totalSpent || 0); })
+      .slice(0, 10)
+      .map(function(c){ return {name:c.name||"", phone:c.phone||"", totalSpent:c.totalSpent||0}; });
+
+    /* مبيعات 6 أشهر */
+    var monthly = [];
+    for (var i = 5; i >= 0; i--) {
+      var d = new Date(); d.setDate(1); d.setMonth(d.getMonth() - i);
+      var mk = d.toISOString().slice(0, 7);
+      var label = d.toLocaleDateString("ar", { month: "long", year: "2-digit" });
+      var sv = ALL_INVOICES.filter(function(x){return (x.date||"").slice(0,7)===mk;}).reduce(function(s,x){return s+x.total;},0);
+      var ev = ALL_EXPENSES.filter(function(e){return (e.date||"").slice(0,7)===mk;}).reduce(function(s,e){return s+e.amount;},0);
+      var sv2 = ALL_SALARIES.filter(function(s){return (s.date||"").slice(0,7)===mk;}).reduce(function(s,p){return s+p.amount;},0);
+      monthly.push({label:label, sales:sv, expenses:ev, salaries:sv2});
+    }
+
+    await exportStatsExcel({
+      month: selMonth,
+      sales: sales, cogs: cogs,
+      gross: sales - cogs,
+      expenses: expTotal, salaries: salTotal,
+      net: (sales - cogs) - expTotal - salTotal,
+      topProducts: topProducts,
+      topCustomers: topCustomers,
+      monthly: monthly
+    });
+  }
+
+  init();
+</script>
+    <script src="js/auto-updater-ui.js"></script>
+</body>
+</html>

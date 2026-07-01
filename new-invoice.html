@@ -1,0 +1,613 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>فاتورة جديدة — WeB Ora</title>
+  <link rel="icon" type="image/png" href="img/mark.png">
+  <link rel="stylesheet" href="css/style.css">
+  <script src="config.js"></script>
+  <script src="js/mode-manager.js"></script>
+  <script src="js/supabase.min.js"></script>
+  <script src="js/auth.js"></script>
+  <script src="js/seclog.js"></script>
+  <script src="js/currency.js"></script>
+  <script src="js/db.js"></script>
+  <script src="js/sync_queue.js"></script>
+  <script src="js/notifications.js"></script>
+  <script src="js/initial_sync.js"></script>
+  <script src="js/sync_replay.js"></script>
+    <script src="js/background_sync.js"></script>
+  <script src="js/python_sync_bridge.js"></script>
+  <script src="js/queue.js"></script>
+  <script src="js/online.js"></script>
+  <script src="js/layout.js"></script>
+  <script src="js/nav-extend.js"></script>
+  <script src="js/print.js"></script>
+  <script src="js/jsbarcode.min.js"></script>
+  <script src="js/silent-print.js"></script>
+  <script src="js/export.js"></script>
+  <style>
+    /* ===== شريط البحث والفلتر ===== */
+    .product-search-box {
+      position: relative;
+    }
+    .product-search-box input {
+      padding-inline-end: 36px;
+    }
+    .product-search-box .search-clear-btn {
+      position: absolute;
+      inset-inline-end: 10px;
+      top: 50%;
+      transform: translateY(-50%);
+      background: none;
+      border: none;
+      cursor: pointer;
+      color: var(--text-muted, #888);
+      font-size: 16px;
+      line-height: 1;
+      padding: 0;
+      display: none;
+    }
+    .product-search-box input:not(:placeholder-shown) + .search-clear-btn {
+      display: block;
+    }
+
+    /* بادج عدد النتائج */
+    .results-badge {
+      font-size: 12px;
+      color: var(--text-muted, #888);
+      margin-top: 4px;
+      display: block;
+      min-height: 16px;
+    }
+
+    /* تمييز نص البحث داخل الـ option */
+    #product-select option.no-results {
+      color: var(--text-muted, #aaa);
+      font-style: italic;
+    }
+
+    /* سطر الفلتر */
+    .filter-row {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 10px;
+      flex-wrap: wrap;
+    }
+    .filter-row .field {
+      flex: 1;
+      min-width: 140px;
+      margin-bottom: 0;
+    }
+    .filter-row .product-search-box {
+      flex: 2;
+      min-width: 180px;
+    }
+  </style>
+  <script src="js/refresh-btn.js"></script>
+</head>
+<body>
+<div id="page">
+  <div class="page-head">
+    <h1>فاتورة جديدة</h1>
+    <p>أضف المنتجات ثم احفظ الفاتورة</p>
+  </div>
+
+  <!-- إضافة منتج -->
+  <div class="card">
+    <h2>
+      <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="16.5" y1="9.4" x2="7.5" y2="4.21"/><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>
+      إضافة منتج
+    </h2>
+
+    <!-- الباركود -->
+    <div class="search-row">
+      <input class="input" id="barcode-input" placeholder="أدخل الباركود أو امسحه ثم اضغط Enter"
+        style="font-family:monospace;direction:ltr;text-align:right">
+      <button class="btn btn-outline" onclick="addByBarcode()">
+        <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 7V5a2 2 0 0 1 2-2h2"/><path d="M17 3h2a2 2 0 0 1 2 2v2"/><path d="M21 17v2a2 2 0 0 1-2 2h-2"/><path d="M7 21H5a2 2 0 0 1-2-2v-2"/><line x1="7" y1="12" x2="17" y2="12"/></svg>
+        إضافة بالباركود
+      </button>
+    </div>
+
+    <!-- ===== فلتر التصنيف + شريط البحث ===== -->
+    <div class="filter-row">
+      <!-- فلتر التصنيف -->
+      <div class="field">
+        <label>التصنيف</label>
+        <select class="input" id="category-filter" onchange="applyFilters()">
+          <option value="">— كل التصنيفات —</option>
+        </select>
+      </div>
+
+      <!-- بحث بالاسم أو الباركود -->
+      <div class="product-search-box">
+        <label style="display:block;margin-bottom:6px;font-size:13px;font-weight:600">بحث بالاسم أو الباركود</label>
+        <div style="position:relative">
+          <input class="input" id="product-search" placeholder="اكتب اسم المنتج أو الباركود…"
+            oninput="applyFilters()" autocomplete="off">
+          <button class="search-clear-btn" id="search-clear-btn" onclick="clearSearch()" title="مسح البحث">✕</button>
+        </div>
+        <span class="results-badge" id="results-badge"></span>
+      </div>
+    </div>
+    <!-- ===== نهاية الفلتر ===== -->
+
+    <div class="form-row">
+      <div class="field mb-0">
+        <label>اختر منتجاً</label>
+        <select class="input" id="product-select" size="1"></select>
+      </div>
+      <div class="field mb-0">
+        <label>الكمية</label>
+        <div style="display:flex;gap:8px">
+          <input class="input" id="qty-input" type="number" min="1" value="1">
+          <button class="btn btn-primary" onclick="addSelected()">
+            <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            إضافة
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- عناصر الفاتورة -->
+  <div class="card">
+    <h2>
+      <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/></svg>
+      عناصر الفاتورة
+    </h2>
+    <div id="cart-items"></div>
+    <div class="empty-state" id="cart-empty">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg>
+      لم تتم إضافة منتجات بعد
+    </div>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-top:12px;padding-top:12px;border-top:1px solid var(--border)">
+      <button class="btn btn-danger btn-sm" onclick="clearCart()">
+        <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/></svg>
+        تفريغ
+      </button>
+      <div style="font-size:18px;font-weight:800">
+        الإجمالي: <span id="cart-total" class="text-green">0</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- بيانات العميل -->
+  <div class="card">
+    <h2>
+      <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+      بيانات العميل
+    </h2>
+
+    <div class="form-row" style="margin-bottom:14px">
+      <button type="button" id="mode-existing" class="btn btn-outline" onclick="setCustMode('existing')" style="flex:1">
+        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
+        عميل موجود
+      </button>
+      <button type="button" id="mode-manual" class="btn btn-outline" onclick="setCustMode('manual')" style="flex:1">
+        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        عميل جديد
+      </button>
+      <button type="button" id="mode-none" class="btn btn-outline" onclick="setCustMode('none')" style="flex:1">
+        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        بدون عميل
+      </button>
+    </div>
+
+    <div id="cust-existing-block" style="display:none">
+      <div class="field">
+        <label>اختر من العملاء المسجلين</label>
+        <select class="input" id="cust-existing-select" onchange="fillFromExisting()">
+          <option value="">— اختر عميلاً —</option>
+        </select>
+      </div>
+    </div>
+
+    <div id="cust-manual-block" style="display:none">
+      <div class="form-row">
+        <div class="field"><label>رقم الجوال</label><input class="input" id="cust-phone" inputmode="tel" placeholder="05XXXXXXXX"></div>
+        <div class="field"><label>الاسم</label><input class="input" id="cust-name" placeholder="اسم العميل"></div>
+      </div>
+      <div class="field"><label>العنوان</label><input class="input" id="cust-address" placeholder="المدينة / الحي"></div>
+    </div>
+
+    <div id="cust-none-block" style="display:none">
+      <p class="text-muted" style="font-size:13px;margin:6px 0">لن تُربط الفاتورة بأي عميل.</p>
+    </div>
+
+    <div class="form-row" style="margin-top:10px">
+      <div class="field">
+        <label>حالة الدفع</label>
+        <select class="input" id="pay-status">
+          <option value="مدفوع">مدفوع</option>
+          <option value="آجل">آجل (دين)</option>
+        </select>
+      </div>
+    </div>
+    <div class="field"><label>ملاحظات</label><textarea class="input" id="notes" placeholder="أي ملاحظات إضافية…"></textarea></div>
+    <div class="btn-group">
+      <button class="btn btn-primary" id="save-btn" onclick="saveInvoice(false)">
+        <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+        حفظ الفاتورة
+      </button>
+      <button class="btn btn-green" onclick="saveInvoice(true)">
+        <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+        حفظ وطباعة
+      </button>
+      <button class="btn btn-outline" onclick="saveAndExportImage()">
+        <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+        حفظ كصورة
+      </button>
+    </div>
+  </div>
+</div>
+
+<script>
+  renderLayout("new");
+
+  var PRODUCTS  = [];
+  var CART      = [];
+  var CUSTOMERS = [];
+  var CUST_MODE = "none";
+
+  /* ============================================================
+     فلتر التصنيف + البحث
+     ============================================================ */
+
+  /**
+   * استخرج التصنيفات الفريدة من قائمة المنتجات وابنِ قائمة الفلتر
+   * يدعم حقل category أو category_name
+   */
+  function buildCategoryFilter() {
+    var categories = [];
+    PRODUCTS.forEach(function (p) {
+      var cat = (p.category || p.category_name || "").trim();
+      if (cat && categories.indexOf(cat) === -1) categories.push(cat);
+    });
+    categories.sort(function (a, b) { return a.localeCompare(b, "ar"); });
+
+    var sel = document.getElementById("category-filter");
+    var opts = '<option value="">— كل التصنيفات —</option>';
+    categories.forEach(function (cat) {
+      opts += '<option value="' + esc(cat) + '">' + esc(cat) + '</option>';
+    });
+    sel.innerHTML = opts;
+  }
+
+  /**
+   * رجع قائمة المنتجات المصفاة بحسب التصنيف المختار ونص البحث
+   */
+  function getFilteredProducts() {
+    var catFilter    = document.getElementById("category-filter").value.trim().toLowerCase();
+    var searchTerm   = document.getElementById("product-search").value.trim().toLowerCase();
+
+    return PRODUCTS.filter(function (p) {
+      /* فلتر التصنيف */
+      if (catFilter) {
+        var pCat = (p.category || p.category_name || "").trim().toLowerCase();
+        if (pCat !== catFilter) return false;
+      }
+
+      /* فلتر البحث: اسم أو باركود */
+      if (searchTerm) {
+        var nameMatch    = (p.name    || "").toLowerCase().indexOf(searchTerm) !== -1;
+        var barcodeMatch = (p.barcode || "").toLowerCase().indexOf(searchTerm) !== -1;
+        if (!nameMatch && !barcodeMatch) return false;
+      }
+
+      return true;
+    });
+  }
+
+  /**
+   * أعِد بناء قائمة المنتجات بناءً على الفلاتر الحالية
+   */
+  function applyFilters() {
+    var filtered = getFilteredProducts();
+    var badge    = document.getElementById("results-badge");
+    var sel      = document.getElementById("product-select");
+
+    if (!filtered.length) {
+      sel.innerHTML = '<option value="" class="no-results">لا توجد منتجات مطابقة</option>';
+      badge.textContent = "لا توجد نتائج";
+      return;
+    }
+
+    var opts = '<option value="">— اختر منتجاً —</option>';
+    filtered.forEach(function (p) {
+      var cat = p.category || p.category_name || "";
+      var catLabel = cat ? " [" + cat + "]" : "";
+      opts += '<option value="' + p.id + '">' +
+        esc(p.name) + catLabel +
+        ' (' + formatPrice(p.price) + ') — مخزون: ' + p.stock +
+        '</option>';
+    });
+    sel.innerHTML = opts;
+
+    var total = PRODUCTS.length;
+    badge.textContent = filtered.length === total
+      ? "يعرض " + total + " منتج"
+      : "يعرض " + filtered.length + " من أصل " + total + " منتج";
+  }
+
+  /** مسح حقل البحث وإعادة البناء */
+  function clearSearch() {
+    document.getElementById("product-search").value = "";
+    applyFilters();
+    document.getElementById("product-search").focus();
+  }
+
+  /* ============================================================
+     بناء القائمة الأوّلية (بدون فلاتر)
+     ============================================================ */
+  function buildProductSelect() {
+    buildCategoryFilter();
+    applyFilters();
+  }
+
+  /* ============================================================
+     باقي كود الفاتورة (بدون تغيير)
+     ============================================================ */
+
+  function setCustMode(mode) {
+    CUST_MODE = mode;
+    document.getElementById("cust-existing-block").style.display = mode === "existing" ? "block" : "none";
+    document.getElementById("cust-manual-block").style.display   = mode === "manual"   ? "block" : "none";
+    document.getElementById("cust-none-block").style.display     = mode === "none"     ? "block" : "none";
+    ["mode-existing", "mode-manual", "mode-none"].forEach(function (id) {
+      document.getElementById(id).classList.remove("btn-primary");
+      document.getElementById(id).classList.add("btn-outline");
+    });
+    document.getElementById("mode-" + mode).classList.remove("btn-outline");
+    document.getElementById("mode-" + mode).classList.add("btn-primary");
+  }
+
+  function fillFromExisting() {
+    var sel   = document.getElementById("cust-existing-select");
+    var phone = sel.value;
+    if (!phone) return;
+    var c = CUSTOMERS.find(function (x) { return x.phone === phone; });
+    if (!c) return;
+  }
+
+  function getCustomerFromForm() {
+    if (CUST_MODE === "none") return null;
+    if (CUST_MODE === "existing") {
+      var sel   = document.getElementById("cust-existing-select");
+      var phone = sel.value;
+      if (!phone) return null;
+      var c = CUSTOMERS.find(function (x) { return x.phone === phone; });
+      return c ? { phone: c.phone, name: c.name || "", address: c.address || "" } : null;
+    }
+    var ph = document.getElementById("cust-phone").value.trim();
+    return ph
+      ? { phone: ph, name: document.getElementById("cust-name").value.trim(), address: document.getElementById("cust-address").value.trim() }
+      : null;
+  }
+
+  async function init() {
+    PRODUCTS = await getProducts();
+    buildProductSelect();
+
+    CUSTOMERS = await getCustomers().catch(function () { return []; });
+    var custOpts = '<option value="">— اختر عميلاً —</option>';
+    CUSTOMERS.forEach(function (c) {
+      custOpts += '<option value="' + esc(c.phone) + '">' + esc(c.name || c.phone) + ' — ' + esc(c.phone) + '</option>';
+    });
+    document.getElementById("cust-existing-select").innerHTML = custOpts;
+
+    var params   = new URLSearchParams(location.search);
+    var urlPhone = params.get("phone") || "";
+    var urlName  = params.get("name")  || "";
+    if (urlPhone) {
+      var existCust = CUSTOMERS.find(function (x) { return x.phone === urlPhone; });
+      if (existCust) {
+        setCustMode("existing");
+        document.getElementById("cust-existing-select").value = urlPhone;
+      } else {
+        setCustMode("manual");
+        document.getElementById("cust-phone").value = urlPhone;
+        document.getElementById("cust-name").value  = urlName;
+      }
+    } else {
+      setCustMode("none");
+    }
+
+    var pending = localStorage.getItem("pending_barcode");
+    if (pending) {
+      localStorage.removeItem("pending_barcode");
+      document.getElementById("barcode-input").value = pending;
+      addByBarcode();
+    }
+    renderCart();
+  }
+
+  function findProduct(id) {
+    for (var i = 0; i < PRODUCTS.length; i++)
+      if (String(PRODUCTS[i].id) === String(id)) return PRODUCTS[i];
+    return null;
+  }
+
+  function addToCart(p, qty) {
+    if (p.stock !== null && p.stock !== undefined && Number(p.stock) <= 0) { toast("المنتج غير متوفر بالمخزون", "error"); return; }
+    for (var i = 0; i < CART.length; i++) {
+      if (String(CART[i].productId) === String(p.id)) {
+        var newQty = CART[i].quantity + qty;
+        if (p.stock !== null && p.stock !== undefined && newQty > Number(p.stock)) {
+          toast("لا يمكن تجاوز المخزون المتاح (" + p.stock + ")", "error"); return;
+        }
+        CART[i].quantity = newQty;
+        CART[i].total = CART[i].quantity * CART[i].price;
+        renderCart(); return;
+      }
+    }
+    CART.push({ productId: p.id, name: p.name, price: p.price, costPrice: p.costPrice || 0, quantity: qty, total: p.price * qty });
+    renderCart();
+  }
+
+  function addSelected() {
+    var id  = document.getElementById("product-select").value;
+    var qty = parseInt(document.getElementById("qty-input").value) || 1;
+    var p   = findProduct(id);
+    if (!p) { toast("اختر منتجاً أولاً", "error"); return; }
+    addToCart(p, qty);
+    document.getElementById("qty-input").value = 1;
+  }
+
+  async function addByBarcode() {
+    var code = document.getElementById("barcode-input").value.trim().replace(/\s+/g, "");
+    if (!code) return;
+    if (!PRODUCTS.length) {
+      PRODUCTS = await getProducts();
+      buildProductSelect();
+    }
+    var p = null;
+    var codeLower = code.toLowerCase();
+    PRODUCTS.forEach(function (x) {
+      var bc = (x.barcode || "").trim().replace(/\s+/g, "");
+      if (bc === code || bc.toLowerCase() === codeLower) p = x;
+    });
+    if (!p) { toast("لا يوجد منتج بهذا الباركود: " + code, "error"); return; }
+    addToCart(p, 1);
+    document.getElementById("barcode-input").value = "";
+    toast("أُضيف: " + p.name, "success");
+
+    /* عند مسح الباركود: ضع الباركود في حقل البحث لإظهار المنتج */
+    document.getElementById("product-search").value = code;
+    applyFilters();
+    setTimeout(function () {
+      document.getElementById("product-search").value = "";
+      applyFilters();
+    }, 1500);
+  }
+
+  document.getElementById("barcode-input").addEventListener("keydown", function (e) {
+    if (e.key === "Enter") { e.preventDefault(); addByBarcode(); }
+  });
+
+  /* بحث سريع عند الكتابة في حقل الباركود (للمعاينة قبل الإضافة) */
+  document.getElementById("barcode-input").addEventListener("input", function () {
+    var val = this.value.trim();
+    if (val.length >= 2) {
+      document.getElementById("product-search").value = val;
+      applyFilters();
+    }
+  });
+
+  function changeQty(idx, delta) {
+    CART[idx].quantity = Math.max(1, CART[idx].quantity + delta);
+    CART[idx].total    = CART[idx].quantity * CART[idx].price;
+    renderCart();
+  }
+
+  function setPrice(idx, val) {
+    var price = parseFloat(val);
+    if (isNaN(price) || price < 0) return;
+    CART[idx].price = price;
+    CART[idx].total = CART[idx].quantity * price;
+    renderCart();
+  }
+
+  function removeItem(idx) { CART.splice(idx, 1); renderCart(); }
+  function clearCart()     { CART = []; renderCart(); }
+  function cartTotal()     { var t = 0; CART.forEach(function (i) { t += i.total; }); return t; }
+
+  function renderCart() {
+    if (!CART.length) {
+      document.getElementById("cart-items").innerHTML     = "";
+      document.getElementById("cart-empty").style.display = "block";
+      document.getElementById("cart-total").textContent   = formatPrice(0);
+      return;
+    }
+    document.getElementById("cart-empty").style.display = "none";
+    var html = "";
+    CART.forEach(function (item, idx) {
+      html += '<div class="invoice-item-row">' +
+        '<div class="item-name">' + esc(item.name) + '<div class="item-price">' + formatPrice(item.price) + ' / وحدة</div></div>' +
+        '<div class="qty-ctrl">' +
+        '<button onclick="changeQty(' + idx + ',-1)">−</button>' +
+        '<strong>' + item.quantity + '</strong>' +
+        '<button onclick="changeQty(' + idx + ',1)">+</button>' +
+        '</div>' +
+        '<div style="display:flex;align-items:center;gap:8px">' +
+        '<label style="font-size:11px;color:var(--text-muted)">السعر</label>' +
+        '<input type="number" class="input" style="width:90px;padding:5px 8px;font-size:12px" value="' + item.price + '" step="0.01" min="0" onchange="setPrice(' + idx + ',this.value)">' +
+        '</div>' +
+        '<div class="fw-bold">' + formatPrice(item.total) + '</div>' +
+        '<button class="btn btn-danger btn-sm" onclick="removeItem(' + idx + ')">' +
+        '<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/></svg>' +
+        '</button></div>';
+    });
+    document.getElementById("cart-items").innerHTML     = html;
+    document.getElementById("cart-total").textContent   = formatPrice(cartTotal());
+  }
+
+  function buildInvoiceObj() {
+    return {
+      invoiceNumber: null,
+      date: new Date().toISOString(),
+      customer: getCustomerFromForm(),
+      items: CART.slice(),
+      total: cartTotal(),
+      paymentStatus: document.getElementById("pay-status").value,
+      notes: document.getElementById("notes").value.trim(),
+    };
+  }
+
+  async function saveInvoice(printAfter) {
+    if (!CART.length) { toast("أضف منتجات أولاً", "error"); return; }
+    var btn = document.getElementById("save-btn");
+    btn.disabled    = true;
+    btn.textContent = "جارٍ الحفظ…";
+
+    var invoice = buildInvoiceObj();
+    invoice.invoiceNumber = await generateInvoiceNumber();
+
+    await addInvoice(invoice);
+    toast("تم حفظ الفاتورة " + invoice.invoiceNumber, "success");
+    if (printAfter) printInvoice(invoice);
+
+    resetForm();
+    btn.disabled = false;
+    btn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg> حفظ الفاتورة';
+    init();
+  }
+
+  async function saveAndExportImage() {
+    if (!CART.length) { toast("أضف منتجات أولاً", "error"); return; }
+    var invoice = buildInvoiceObj();
+    invoice.invoiceNumber = await generateInvoiceNumber();
+    await addInvoice(invoice);
+    toast("تم حفظ الفاتورة", "success");
+    setTimeout(function () { exportInvoiceAsImage(invoice); }, 300);
+    resetForm(); init();
+  }
+
+  function resetForm() {
+    CART = [];
+    renderCart();
+    setCustMode("none");
+    /* مسح الفلاتر */
+    document.getElementById("category-filter").value = "";
+    document.getElementById("product-search").value  = "";
+    applyFilters();
+
+    var manPh = document.getElementById("cust-phone");
+    var manNm = document.getElementById("cust-name");
+    var manAd = document.getElementById("cust-address");
+    if (manPh) manPh.value = "";
+    if (manNm) manNm.value = "";
+    if (manAd) manAd.value = "";
+    var sel = document.getElementById("cust-existing-select");
+    if (sel) sel.value = "";
+    document.getElementById("notes").value      = "";
+    document.getElementById("pay-status").value = "مدفوع";
+  }
+
+  init();
+</script>
+    <script src="js/auto-updater-ui.js"></script>
+</body>
+</html>

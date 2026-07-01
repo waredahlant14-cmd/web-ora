@@ -1,0 +1,291 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>العروض والخصومات — WeB Ora</title>
+  <link rel="icon" type="image/png" href="img/mark-glow.png">
+  <link rel="stylesheet" href="css/style.css">
+  <script src="config.js"></script>
+  <script src="js/mode-manager.js"></script>
+  <script src="js/supabase.min.js"></script>
+  <script src="js/auth.js"></script>
+  <script src="js/seclog.js"></script>
+  <script src="js/currency.js"></script>
+  <script src="js/db.js"></script>
+  <script src="js/sync_queue.js"></script>
+  <script src="js/notifications.js"></script>
+  <script src="js/initial_sync.js"></script>
+  <script src="js/sync_replay.js"></script>
+    <script src="js/background_sync.js"></script>
+  <script src="js/queue.js"></script>
+  <script src="js/online.js"></script>
+  <script src="js/layout.js"></script>
+  <script src="js/nav-extend.js"></script>
+  <script src="js/offers.js"></script>
+  <style>
+    .offer-type-badge { display:inline-flex;align-items:center;gap:4px;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:700 }
+    .type-percent  { background:var(--blue-light);color:var(--blue-text) }
+    .type-fixed    { background:var(--green-light);color:var(--green-text) }
+    .type-buy_x_get_y { background:var(--yellow-light);color:var(--yellow-text) }
+    .offer-inactive { opacity:.5 }
+    .toggle-active { cursor:pointer;user-select:none }
+  </style>
+  <script src="js/refresh-btn.js"></script>
+</head>
+<body>
+<div id="page">
+  <div class="page-head">
+    <h1>العروض والخصومات</h1>
+    <p>إدارة العروض والخصومات التلقائية على المبيعات</p>
+  </div>
+
+  <div class="card">
+    <div class="flex-between" style="margin-bottom:16px">
+      <h2 style="margin:0">قائمة العروض</h2>
+      <button class="btn btn-primary" onclick="openAddModal()">
+        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        عرض جديد
+      </button>
+    </div>
+    <div class="table-wrap">
+      <table class="table">
+        <thead>
+          <tr>
+            <th>اسم العرض</th>
+            <th>النوع</th>
+            <th>القيمة</th>
+            <th>يسري على</th>
+            <th>من</th>
+            <th>إلى</th>
+            <th>الحالة</th>
+            <th>إجراءات</th>
+          </tr>
+        </thead>
+        <tbody id="offers-body"></tbody>
+      </table>
+    </div>
+    <div class="empty-state" id="offers-empty" style="display:none">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>
+      لا توجد عروض بعد — أضف عرضاً جديداً
+    </div>
+  </div>
+</div>
+
+<!-- Modal إضافة/تعديل -->
+<div class="modal" id="offer-modal">
+  <div class="modal-box" style="max-width:560px">
+    <div class="modal-head">
+      <h3 id="modal-title">عرض جديد</h3>
+      <button class="modal-close" onclick="closeModal('offer-modal')">✕</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="edit-id">
+      <div class="field">
+        <label class="label">اسم العرض *</label>
+        <input class="input" id="f-name" placeholder="مثال: خصم نهاية الأسبوع">
+      </div>
+      <div class="field">
+        <label class="label">نوع العرض *</label>
+        <select class="input" id="f-type" onchange="onTypeChange()">
+          <option value="percent">نسبة خصم (%)</option>
+          <option value="fixed">مبلغ ثابت</option>
+          <option value="buy_x_get_y">اشترِ X واحصل على Y مجاناً</option>
+        </select>
+      </div>
+      <div id="val-row" class="field">
+        <label class="label" id="val-label">نسبة الخصم (%)</label>
+        <input class="input" id="f-value" type="number" min="0" step="0.01" placeholder="0">
+      </div>
+      <div id="bxy-row" style="display:none;gap:12px" class="flex-between">
+        <div class="field" style="flex:1">
+          <label class="label">اشترِ (كمية)</label>
+          <input class="input" id="f-buy" type="number" min="1" value="2">
+        </div>
+        <div class="field" style="flex:1">
+          <label class="label">احصل على (كمية)</label>
+          <input class="input" id="f-get" type="number" min="1" value="1">
+        </div>
+      </div>
+      <div class="field">
+        <label class="label">الحد الأدنى للكمية</label>
+        <input class="input" id="f-minqty" type="number" min="1" value="1">
+      </div>
+      <div class="field">
+        <label class="label">يسري على</label>
+        <select class="input" id="f-appliesto" onchange="onAppliesChange()">
+          <option value="all">جميع المنتجات</option>
+          <option value="category">فئة معينة</option>
+          <option value="products">منتجات محددة</option>
+        </select>
+      </div>
+      <div id="target-row" class="field" style="display:none">
+        <label class="label" id="target-label">الفئات / المنتجات (افصل بفاصلة)</label>
+        <input class="input" id="f-targets" placeholder="">
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+        <div class="field">
+          <label class="label">تاريخ البداية</label>
+          <input class="input" id="f-start" type="date">
+        </div>
+        <div class="field">
+          <label class="label">تاريخ النهاية</label>
+          <input class="input" id="f-end" type="date">
+        </div>
+      </div>
+      <div style="display:flex;align-items:center;gap:10px;margin-top:4px">
+        <input type="checkbox" id="f-active" checked style="width:16px;height:16px;accent-color:var(--primary)">
+        <label for="f-active" style="font-size:14px;font-weight:600;cursor:pointer">تفعيل العرض</label>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-outline" onclick="closeModal('offer-modal')">إلغاء</button>
+      <button class="btn btn-primary" onclick="saveOffer()">حفظ العرض</button>
+    </div>
+  </div>
+</div>
+
+<script>
+renderLayout("offers");
+
+var _offers = [];
+var _products = [];
+
+async function load() {
+  _offers   = await getOffers();
+  _products = await getProducts();
+  render();
+}
+
+function render() {
+  var tbody = document.getElementById("offers-body");
+  var empty = document.getElementById("offers-empty");
+  if (!_offers.length) { empty.style.display=""; tbody.innerHTML=""; return; }
+  empty.style.display = "none";
+  var today = new Date().toISOString().slice(0,10);
+
+  tbody.innerHTML = _offers.map(function(o) {
+    var expired = o.endDate && o.endDate < today;
+    var typeLabel = o.type==="percent" ? "نسبة %" : o.type==="fixed" ? "مبلغ ثابت" : "اشترِ X+Y";
+    var typeClass = o.type==="percent" ? "type-percent" : o.type==="fixed" ? "type-fixed" : "type-buy_x_get_y";
+    var valText   = o.type==="percent" ? o.value+"%" : o.type==="fixed" ? formatPrice(o.value) : "اشترِ "+o.buyQty+" احصل على "+o.getQty;
+    var appliesText = o.appliesTo==="all" ? "الكل" : o.appliesTo==="category" ? "فئة" : "منتجات محددة";
+    var activeClass = (!o.active||expired) ? " offer-inactive" : "";
+    return '<tr class="'+activeClass+'">'+
+      '<td class="fw-bold">'+esc(o.name)+'</td>'+
+      '<td><span class="offer-type-badge '+typeClass+'">'+typeLabel+'</span></td>'+
+      '<td>'+esc(valText)+'</td>'+
+      '<td>'+esc(appliesText)+'</td>'+
+      '<td class="text-muted direction-ltr">'+(o.startDate||"—")+'</td>'+
+      '<td class="text-muted direction-ltr">'+(o.endDate||"—")+'</td>'+
+      '<td>'+
+        (expired ? '<span class="badge badge-red">منتهي</span>' :
+         o.active ? '<span class="badge badge-green">فعّال</span>' :
+                    '<span class="badge" style="background:var(--border);color:var(--text-muted)">متوقف</span>')+
+      '</td>'+
+      '<td style="display:flex;gap:6px">'+
+        '<button class="btn btn-outline btn-sm" onclick="editOffer('+o.id+')">تعديل</button>'+
+        '<button class="btn btn-sm" style="background:var(--red-light);color:var(--red-text)" onclick="removeOffer('+o.id+')">حذف</button>'+
+      '</td>'+
+    '</tr>';
+  }).join("");
+}
+
+function onTypeChange() {
+  var t = document.getElementById("f-type").value;
+  document.getElementById("val-row").style.display  = t==="buy_x_get_y" ? "none" : "";
+  document.getElementById("bxy-row").style.display  = t==="buy_x_get_y" ? "flex" : "none";
+  document.getElementById("val-label").textContent  = t==="percent" ? "نسبة الخصم (%)" : "مبلغ الخصم";
+}
+function onAppliesChange() {
+  var v = document.getElementById("f-appliesto").value;
+  var row = document.getElementById("target-row");
+  row.style.display = v==="all" ? "none" : "";
+  document.getElementById("target-label").textContent =
+    v==="category" ? "أسماء الفئات (افصل بفاصلة)" : "IDs المنتجات (افصل بفاصلة)";
+}
+
+function openAddModal() {
+  document.getElementById("edit-id").value = "";
+  document.getElementById("modal-title").textContent = "عرض جديد";
+  document.getElementById("f-name").value = "";
+  document.getElementById("f-type").value = "percent";
+  document.getElementById("f-value").value = "";
+  document.getElementById("f-buy").value = "2";
+  document.getElementById("f-get").value = "1";
+  document.getElementById("f-minqty").value = "1";
+  document.getElementById("f-appliesto").value = "all";
+  document.getElementById("f-targets").value = "";
+  document.getElementById("f-start").value = "";
+  document.getElementById("f-end").value = "";
+  document.getElementById("f-active").checked = true;
+  onTypeChange(); onAppliesChange();
+  openModal("offer-modal");
+}
+
+function editOffer(id) {
+  var o = _offers.find(function(x){return x.id===id;});
+  if (!o) return;
+  document.getElementById("edit-id").value = id;
+  document.getElementById("modal-title").textContent = "تعديل العرض";
+  document.getElementById("f-name").value = o.name;
+  document.getElementById("f-type").value = o.type;
+  document.getElementById("f-value").value = o.value;
+  document.getElementById("f-buy").value = o.buyQty||2;
+  document.getElementById("f-get").value = o.getQty||1;
+  document.getElementById("f-minqty").value = o.minQty||1;
+  document.getElementById("f-appliesto").value = o.appliesTo||"all";
+  document.getElementById("f-targets").value = (o.targetIds||[]).join(", ");
+  document.getElementById("f-start").value = o.startDate||"";
+  document.getElementById("f-end").value = o.endDate||"";
+  document.getElementById("f-active").checked = !!o.active;
+  onTypeChange(); onAppliesChange();
+  openModal("offer-modal");
+}
+
+async function saveOffer() {
+  var name = document.getElementById("f-name").value.trim();
+  if (!name) { toast("يرجى إدخال اسم العرض","error"); return; }
+  var type     = document.getElementById("f-type").value;
+  var value    = parseFloat(document.getElementById("f-value").value)||0;
+  var targets  = document.getElementById("f-targets").value
+    .split(",").map(function(x){return x.trim();}).filter(Boolean);
+  var o = {
+    name:       name,
+    type:       type,
+    value:      value,
+    minQty:     parseInt(document.getElementById("f-minqty").value)||1,
+    buyQty:     parseInt(document.getElementById("f-buy").value)||2,
+    getQty:     parseInt(document.getElementById("f-get").value)||1,
+    appliesTo:  document.getElementById("f-appliesto").value,
+    targetIds:  targets,
+    startDate:  document.getElementById("f-start").value||null,
+    endDate:    document.getElementById("f-end").value||null,
+    active:     document.getElementById("f-active").checked
+  };
+  var editId = document.getElementById("edit-id").value;
+  if (editId) {
+    await updateOffer(Number(editId), o);
+    toast("تم تحديث العرض","success");
+  } else {
+    await addOffer(o);
+    toast("تمت إضافة العرض","success");
+  }
+  closeModal("offer-modal");
+  _offers = await getOffers();
+  render();
+}
+
+async function removeOffer(id) {
+  if (!confirm("هل تريد حذف هذا العرض؟")) return;
+  await deleteOffer(id);
+  toast("تم حذف العرض","success");
+  _offers = await getOffers();
+  render();
+}
+
+load();
+</script>
+    <script src="js/auto-updater-ui.js"></script>
+</body>
+</html>

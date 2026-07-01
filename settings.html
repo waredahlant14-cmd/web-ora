@@ -1,0 +1,565 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>الإعدادات — WeB Ora</title>
+  <link rel="icon" type="image/png" href="img/mark.png">
+  <link rel="stylesheet" href="css/style.css">
+  <script src="config.js"></script>
+  <script src="js/mode-manager.js"></script>
+  <script src="js/supabase.min.js"></script>
+  <script src="js/auth.js"></script>
+  <script src="js/seclog.js"></script>
+  <script src="js/currency.js"></script>
+  <script src="js/db.js"></script>
+  <script src="js/sync_queue.js"></script>
+  <script src="js/notifications.js"></script>
+  <script src="js/initial_sync.js"></script>
+  <script src="js/sync_replay.js"></script>
+    <script src="js/background_sync.js"></script>
+  <script src="js/queue.js"></script>
+  <script src="js/online.js"></script>
+  <script src="js/layout.js"></script>
+  <script src="js/nav-extend.js"></script>
+  <script>document.addEventListener("DOMContentLoaded", function(){ if(typeof requireLogin==="function") requireLogin(); });</script>
+  <script src="js/export.js"></script>
+  <script src="js/setup.js"></script>
+  <script src="js/refresh-btn.js"></script>
+</head>
+<body>
+<div id="page">
+  <div class="page-head">
+    <h1>الإعدادات</h1>
+    <p>العملة، الحساب، والنسخ الاحتياطي</p>
+  </div>
+
+    <!-- وضع التشغيل — v5.1.2 -->
+  <div class="card" id="app-mode-card">
+    <h2>
+      <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
+      وضع التشغيل
+    </h2>
+    <p style="font-size:14px;color:var(--text-muted);margin-bottom:16px">
+      الوضع الحالي: <strong id="current-mode-label" style="color:var(--primary)">جارٍ التحميل…</strong>
+    </p>
+    <div style="display:flex;gap:10px;flex-wrap:wrap">
+      <button class="btn btn-primary btn-sm" onclick="showModeModal()">تغيير وضع التشغيل</button>
+      <button class="btn btn-outline btn-sm" onclick="if(confirm('ستُحذَف البيانات المحلية وتُعاد أول مزامنة. متأكد؟')) resetAppMode()">إعادة الإعداد من البداية</button>
+    </div>
+    <p class="text-muted" style="font-size:12px;margin-top:12px">
+      بلا إنترنت: جهاز واحد فقط — سحابي: مزامنة بين الأجهزة — توازي: كتابة مزدوجة (للمتقدمين)
+    </p>
+  </div>
+
+  <!-- قاعدة البيانات -->
+  <div class="card">
+    <h2>
+      <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>
+      حالة قاعدة البيانات
+    </h2>
+    <p id="db-status" style="font-size:14px">جارٍ الفحص…</p>
+    <div style="margin-top:12px;display:flex;gap:10px;flex-wrap:wrap">
+      <button class="btn btn-outline btn-sm" onclick="triggerSync()">
+        <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+        مزامنة الآن
+      </button>
+      <span id="pending-count" style="font-size:13px;color:var(--text-muted)"></span>
+    </div>
+    <p class="text-muted" style="font-size:12px;margin-top:8px">
+      
+  
+ 
+ 
+    </p>
+  </div>
+
+  <!-- وضع بلا إنترنت -->
+  <div class="card">
+    <h2>
+      <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+      وضع بلا إنترنت
+    </h2>
+    <p style="font-size:14px;color:var(--text-muted);margin-bottom:16px">
+      عند التفعيل، لن يحاول التطبيق الاتصال بـ Supabase نهائياً — تعمل جميع العمليات محلياً فقط.
+      عند إلغاء التفعيل، تُرسَل العمليات المعلقة تلقائياً.
+    </p>
+    <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap">
+      <div style="display:flex;align-items:center;gap:10px">
+        <span style="font-size:14px;font-weight:600">الوضع المحلي الكامل</span>
+        <label class="toggle-switch" id="offline-label">
+          <input type="checkbox" id="offline-toggle" onchange="handleOfflineToggle(this)">
+          <span class="toggle-track"></span>
+        </label>
+      </div>
+      <span id="offline-mode-status" style="font-size:13px;padding:4px 12px;border-radius:20px;font-weight:600"></span>
+    </div>
+    <p class="text-muted" style="font-size:12px;margin-top:12px">
+      مناسب للعمل في بيئة بدون إنترنت — الفواتير والمنتجات تُحفَظ محلياً وتُزامَن تلقائياً عند العودة للاتصال
+    </p>
+  </div>
+
+  <!-- العملة -->
+  <div class="card">
+    <h2>
+      <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+      العملة النشطة
+    </h2>
+    <div class="field">
+      <label>اختر العملة الرئيسية للعرض</label>
+      <select class="input" id="currency-select" onchange="changeCurrency()" style="max-width:280px"></select>
+    </div>
+    <p class="text-muted" style="font-size:12px">الأسعار تُحفظ دائماً بالدولار USD — العملة المختارة للعرض فقط</p>
+
+    <h2 style="margin-top:20px">أسعار الصرف (مقابل الدولار USD)</h2>
+    <div class="table-wrap">
+      <table class="table">
+        <thead><tr><th>العملة</th><th>الرمز</th><th>سعر الصرف</th></tr></thead>
+        <tbody id="rates-body"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- الحساب الشخصي -->
+  <div class="card">
+    <h2>
+      <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+      بيانات الدخول
+    </h2>
+    <div class="form-row">
+      <div class="field"><label>اسم المستخدم</label><input class="input" id="acc-user"></div>
+      <div class="field">
+        <label>كلمة المرور الجديدة</label>
+        <input class="input" id="acc-pass" type="password" placeholder="اتركها فارغة للإبقاء على الحالية"
+               autocomplete="new-password">
+      </div>
+    </div>
+    <div class="field"><label>الاسم الظاهر</label><input class="input" id="acc-name"></div>
+    <button class="btn btn-primary" id="save-acc-btn" onclick="saveAccount()">
+      <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/></svg>
+      حفظ بيانات الدخول
+    </button>
+  </div>
+
+  <!-- إدارة المستخدمين -->
+  <div class="card" id="users-card">
+    <h2>
+      <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+      إدارة المستخدمين
+    </h2>
+    <div class="table-wrap" style="margin-bottom:14px">
+      <table class="table">
+        <thead><tr><th>اسم المستخدم</th><th>الاسم</th><th>الدور</th><th></th></tr></thead>
+        <tbody id="users-body"></tbody>
+      </table>
+    </div>
+    <button class="btn btn-outline" onclick="openAddUser()">
+      <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+      إضافة مستخدم جديد
+    </button>
+  </div>
+
+
+  <!-- إعداد النظام — نُقل من الشريط الجانبي v5.2.5 -->
+  <div class="card" id="system-setup-card">
+    <h2>
+      <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/><line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/><line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/><line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="17" y1="16" x2="23" y2="16"/></svg>
+      إعداد النظام
+    </h2>
+    <p class="text-muted" style="font-size:13px;margin-bottom:12px">
+      الإعداد الأولي للنظام — الاتصال بقاعدة البيانات السحابية والإعدادات العامة للتطبيق.
+    </p>
+    <div style="display:flex;gap:10px;flex-wrap:wrap">
+      <a href="setup-wizard.html" class="btn btn-primary">
+        <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/><line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/><line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/><line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="17" y1="16" x2="23" y2="16"/></svg>
+        فتح معالج الإعداد
+      </a>
+      <a href="branches.html" class="btn btn-outline" id="branches-btn">
+        <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="6" y1="3" x2="6" y2="15"/><circle cx="18" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M18 9a9 9 0 0 1-9 9"/></svg>
+        إدارة الفروع
+      </a>
+    </div>
+  </div>
+
+
+  <!-- اختصارات سطح المكتب v5.2.5 -->
+  <div class="card" id="shortcuts-card" style="display:none">
+    <h2>
+      <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+      اختصارات سطح المكتب
+    </h2>
+    <p class="text-muted" style="font-size:13px;margin-bottom:12px">
+      أنشئ اختصارات سريعة على سطح المكتب للوصول المباشر لصفحات النظام.
+    </p>
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:10px;margin-bottom:12px" id="shortcut-grid">
+      <!-- تُملأ بالجافاسكريبت -->
+    </div>
+    <button class="btn btn-outline btn-sm" onclick="createAllShortcuts()">
+      <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+      إنشاء جميع الاختصارات دفعة واحدة
+    </button>
+  </div>
+
+  <!-- النسخ الاحتياطي -->
+  <div class="card">
+    <h2>
+      <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+      النسخ الاحتياطي الشامل
+    </h2>
+    <p class="text-muted" style="font-size:13px;margin-bottom:12px">
+      يصدّر ويستورد كل البيانات (منتجات، فواتير، عملاء، موظفون، مصاريف، رواتب، إعدادات) كملف JSON.
+    </p>
+    <div class="btn-group">
+      <button class="btn btn-outline" onclick="exportFullBackup(event)">
+        <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        تصدير نسخة احتياطية شاملة
+      </button>
+      <button class="btn btn-outline" onclick="exportAllDataJSON()">
+        <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        نسخة احتياطية محلية (سريعة)
+      </button>
+      <button class="btn btn-outline" onclick="document.getElementById('import-file').click()">
+        <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+        استيراد نسخة احتياطية
+      </button>
+      <input type="file" id="import-file" accept=".json" style="display:none" onchange="importDataJSON(this)">
+    </div>
+  </div>
+</div>
+
+<!-- نافذة مستخدم جديد -->
+<div class="modal-overlay" id="user-modal">
+  <div class="modal">
+    <h3>
+      <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+      مستخدم جديد
+    </h3>
+    <div class="field"><label>اسم المستخدم *</label><input class="input" id="nu-user" autocomplete="off"></div>
+    <div class="field"><label>كلمة المرور *</label><input class="input" id="nu-pass" type="password" autocomplete="new-password"></div>
+    <div class="field"><label>الاسم الظاهر</label><input class="input" id="nu-name" autocomplete="off"></div>
+    <div class="field">
+      <label>الدور</label>
+      <select class="input" id="nu-role">
+        <option value="cashier">كاشير (صلاحيات محدودة)</option>
+        <option value="admin">مدير (صلاحيات كاملة)</option>
+      </select>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-primary" id="save-user-btn" onclick="saveUser()">إضافة</button>
+      <button class="btn btn-outline" onclick="closeModal('user-modal')">إلغاء</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  renderLayout("settings");
+
+  /* ─── حالة قاعدة البيانات ─── */
+  (async function () {
+    var online = await sbReady();
+    document.getElementById("db-status").innerHTML = online
+      ? '<span class="conn-dot on"></span> متصل بـ Supabase — البيانات تُحفظ سحابياً'
+      : '<span class="conn-dot off"></span> وضع محلي — البيانات في المتصفح · ستُرسَل تلقائياً عند الاتصال';
+    var pending = getPendingCount();
+    if (pending > 0) {
+      document.getElementById("pending-count").textContent = "⏳ " + pending + " عملية معلقة تنتظر الإرسال";
+    }
+  })();
+
+  function triggerSync() {
+    if (typeof isOfflineModeForced === "function" && isOfflineModeForced()) {
+      toast("وضع بلا إنترنت مفعّل — عطّله أولاً للمزامنة", "warning"); return;
+    }
+    if (typeof syncNow === "function") {
+      syncNow().then(function(){ location.reload(); });
+    } else {
+      toast("قاعدة البيانات غير متصلة", "error");
+    }
+  }
+
+  /* ─── وضع بلا إنترنت ─── */
+  function handleOfflineToggle(el) {
+    var on = el.checked;
+    if (typeof setOfflineMode === "function") setOfflineMode(on);
+    renderOfflineModeStatus();
+    toast(on ? "تم تفعيل الوضع المحلي الكامل ✓" : "تم تعطيل الوضع المحلي — ستُزامَن بياناتك", on ? "info" : "success");
+    if (!on && typeof bgsRun === "function") setTimeout(bgsRun, 1000);
+  }
+  function renderOfflineModeStatus() {
+    var forced = typeof isOfflineModeForced === "function" && isOfflineModeForced();
+    var chk    = document.getElementById("offline-toggle");
+    var lbl    = document.getElementById("offline-mode-status");
+    if (chk) chk.checked = forced;
+    if (lbl) {
+      lbl.textContent  = forced ? "مفعّل" : "معطّل";
+      lbl.style.background = forced ? "rgba(245,124,32,.15)" : "rgba(16,185,129,.12)";
+      lbl.style.color      = forced ? "#F57C20" : "#10b981";
+    }
+  }
+  renderOfflineModeStatus();
+
+  /* ─── العملات ─── */
+  function renderCurrency() {
+    try {
+      var s = (typeof getSettings === "function") ? getSettings() : null;
+      if (!s || !s.currencies || !s.currencies.length) {
+        s = { activeCurrency: "USD", currencies: (typeof DEFAULT_CURRENCIES !== "undefined" ? DEFAULT_CURRENCIES.slice() : []) };
+      }
+      var opts = "";
+      s.currencies.forEach(function (c) {
+        opts += '<option value="'+c.code+'"'+(c.code===s.activeCurrency?" selected":"")+">"+
+          (c.flag||"")+" "+c.name+" ("+c.symbol+")</option>";
+      });
+      var sel = document.getElementById("currency-select");
+      if (sel) sel.innerHTML = opts;
+
+      var rows = "";
+      s.currencies.forEach(function (c) {
+        rows += "<tr><td>"+(c.flag||"")+" "+c.name+"</td><td class='fw-600'>"+c.symbol+"</td>"+
+          "<td><input class='input' style='max-width:130px;direction:ltr;text-align:right' type='number' step='0.001' min='0.001' value='"+c.rate+"'"+
+          " onchange='setRate(\""+c.code+"\", this.value)'"+(c.code==="USD"?" disabled":"")+"></td></tr>";
+      });
+      var rb = document.getElementById("rates-body");
+      if (rb) rb.innerHTML = rows;
+    } catch(e) { console.error("renderCurrency error:", e); }
+  }
+
+  function changeCurrency() {
+    setActiveCurrency(document.getElementById("currency-select").value);
+    toast("تم تغيير العملة النشطة","success");
+    setTimeout(function(){location.reload();},700);
+  }
+
+  function setRate(code, value) {
+    var rate = parseFloat(value);
+    if (isNaN(rate)||rate<=0) {toast("سعر صرف غير صالح","error");return;}
+    updateCurrencyRate(code, rate);
+    toast("تم تحديث سعر الصرف لـ "+code,"success");
+  }
+
+  /* ─── حساب المستخدم — async ─── */
+  function loadAccount() {
+    var u = getCurrentUser();
+    if (!u) return;
+    document.getElementById("acc-user").value = u.username;
+    document.getElementById("acc-name").value = u.name||"";
+  }
+
+  async function saveAccount() {
+    var u       = getCurrentUser();
+    if (!u) return;
+    var users   = getUsers();
+    var newUser = document.getElementById("acc-user").value.trim();
+    var newPass = document.getElementById("acc-pass").value;
+    var newName = document.getElementById("acc-name").value.trim();
+    if (!newUser) {toast("اسم المستخدم مطلوب","error");return;}
+    if (newPass && newPass.length < 4) {toast("كلمة المرور 4 أحرف على الأقل","error");return;}
+
+    var btn = document.getElementById("save-acc-btn");
+    btn.disabled=true; btn.textContent="جارٍ الحفظ…";
+
+    for (var i=0;i<users.length;i++) {
+      if (users[i].id===u.id) {
+        users[i].username = newUser;
+        if (newName) users[i].name = newName;
+        if (newPass) {
+          users[i].password = await hashPassword(newPass);
+          users[i].pwv = 1;
+        }
+      }
+    }
+    saveUsers(users);
+    /* تحديث الجلسة بالبيانات الجديدة */
+    var updated = users.find(function(x){return x.id===u.id;});
+    if (updated) setSession(updated);
+
+    toast("تم حفظ بيانات الدخول","success");
+    document.getElementById("acc-pass").value="";
+    btn.disabled=false; btn.textContent="حفظ بيانات الدخول";
+  }
+
+  /* ─── المستخدمون ─── */
+  async function renderUsers() {
+    if (!isAdmin()) {document.getElementById("users-card").style.display="none";return;}
+    var buildTable = function(users) {
+      var html = "";
+      users.forEach(function(u){
+        html += "<tr><td class='fw-bold'>"+esc(u.username)+"</td><td>"+esc(u.name||u.username)+"</td>"+
+          "<td><span class='badge "+(u.role==="admin"?"badge-orange":"badge-blue")+"'>"+
+          (u.role==="admin"?"مدير":"كاشير")+"</span></td>"+
+          "<td><button class='btn btn-danger btn-sm' onclick=\"removeUser('"+esc(String(u.id||u.username))+"')\">" +
+          "<svg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2'><polyline points='3 6 5 6 21 6'/><path d='M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6'/></svg>"+
+          "</button></td></tr>";
+      });
+      document.getElementById("users-body").innerHTML = html || "<tr><td colspan='4' style='text-align:center;color:#aaa'>لا يوجد مستخدمون</td></tr>";
+    };
+    /* عرض المحلي أولاً */
+    buildTable(getUsers());
+    /* جلب من Supabase وتحديث */
+    try {
+      if (typeof SB !== "undefined" && SB && navigator.onLine) {
+        var r = await SB.from("app_users").select("id,username,name,role,active").order("id");
+        if (!r.error && r.data && r.data.length > 0) {
+          var localUsers = getUsers();
+          var cloudUsers = r.data.map(function(u){
+            var lu = localUsers.find(function(x){return x.username===u.username;});
+            return {id:String(u.id), username:u.username, name:u.name||u.username,
+                    role:u.role||"cashier", active:u.active!==false, pwv:1,
+                    password: lu ? lu.password : ""};
+          });
+          saveUsers(cloudUsers);
+          buildTable(cloudUsers);
+        }
+      }
+    } catch(e) { /* استمر بالمحلي */ }
+  }
+
+  function openAddUser() { openModal("user-modal"); }
+
+  async function saveUser() {
+    var username = document.getElementById("nu-user").value.trim();
+    var password = document.getElementById("nu-pass").value;
+    var name     = document.getElementById("nu-name").value.trim()||username;
+    var role     = document.getElementById("nu-role").value;
+    if (!username||!password) {toast("اسم المستخدم وكلمة المرور مطلوبان","error");return;}
+    if (password.length<4) {toast("كلمة المرور 4 أحرف على الأقل","error");return;}
+
+    var btn = document.getElementById("save-user-btn");
+    btn.disabled=true; btn.textContent="جارٍ الإضافة…";
+
+    var result = await createUser(username, password, name, role);
+    btn.disabled=false; btn.textContent="إضافة";
+
+    if (result.error==="duplicate") {toast("اسم المستخدم موجود مسبقاً","error");return;}
+    if (result.cloud) {
+      toast("✓ تمت إضافة المستخدم وحُفظ في السحابة","success");
+    } else {
+      toast("تمت إضافة المستخدم محلياً (سيُزامَن عند الاتصال)","success");
+    }
+    closeModal("user-modal");
+    document.getElementById("nu-user").value="";
+    document.getElementById("nu-pass").value="";
+    document.getElementById("nu-name").value="";
+    renderUsers();
+  }
+
+  async function removeUser(id) {
+    var u = getCurrentUser();
+    if (u&&u.id===id) {toast("لا يمكن حذف المستخدم الحالي","error");return;}
+    var allUsers = getUsers();
+    var target = allUsers.find(function(x){return x.id===id;});
+    var users = allUsers.filter(function(x){return x.id!==id;});
+    if (!users.some(function(x){return x.role==="admin";})) {toast("يجب وجود مدير واحد على الأقل","error");return;}
+    saveUsers(users);
+    if (target && typeof deleteUserFromCloud === "function") await deleteUserFromCloud(target.username);
+    toast("تم حذف المستخدم","success");
+    renderUsers();
+  }
+
+  renderCurrency();
+  loadAccount();
+  renderUsers();
+
+  /* نسخة احتياطية شاملة تشمل Supabase */
+  async function exportFullBackup(ev) {
+    /* إصلاح: استقبال event كمعامل بدلاً من الاعتماد على window.event المهجور */
+    var btn = (ev && ev.target) ? ev.target.closest("button") : null;
+    if (btn) { btn.disabled=true; btn.textContent="جارٍ التجميع…"; }
+    toast("جارٍ تجميع النسخة الاحتياطية الشاملة…", "");
+
+    var data = {
+      exportedAt: new Date().toISOString(),
+      version: "5.1",
+      source: "full",
+      products:    [],
+      invoices:    [],
+      customers:   [],
+      employees:   [],
+      expenses:    [],
+      salaries:    [],
+      activity:    [],
+      settings:    null,
+      customize:   null,
+      users:       []
+    };
+
+    /* جلب من Supabase إذا متاح */
+    var online = await sbReady();
+    if (online) {
+      try {
+        var [pr, inv, invItems, cust, exp, sal, act, users] = await Promise.all([
+          SB.from("products").select("*"),
+          SB.from("invoices").select("*"),
+          SB.from("invoice_items").select("*"),
+          SB.from("customers").select("*"),
+          SB.from("expenses").select("*").catch(function(){return {data:[]};}),
+          SB.from("salary_payments").select("*").catch(function(){return {data:[]};}),
+          SB.from("activity_log").select("*").catch(function(){return {data:[]};}),
+          SB.from("app_users").select("id,username,name,role,active").catch(function(){return {data:[]};})
+        ]);
+        data.products  = pr.data||[];
+        data.customers = cust.data||[];
+        data.expenses  = exp.data||[];
+        data.salaries  = sal.data||[];
+        data.activity  = act.data||[];
+        data.users     = users.data||[];
+        /* دمج الفواتير مع عناصرها */
+        var items = invItems.data||[];
+        data.invoices = (inv.data||[]).map(function(v){
+          return Object.assign({}, v, {
+            items: items.filter(function(i){return i.invoice_number===v.invoice_number;})
+          });
+        });
+        data.source = "supabase";
+      } catch(e) { toast("تعذّر جلب بعض البيانات من السحابة، سيتم استخدام المحلي",""); }
+    }
+
+    /* إضافة البيانات المحلية الغائبة */
+    if (!data.products.length)  data.products  = JSON.parse(localStorage.getItem("acc_products_pro")||"[]");
+    if (!data.invoices.length)  data.invoices  = JSON.parse(localStorage.getItem("acc_invoices_history")||"[]");
+    if (!data.customers.length) data.customers = JSON.parse(localStorage.getItem("acc_customers")||"[]");
+    if (!data.employees.length) data.employees = JSON.parse(localStorage.getItem("acc_employees")||"[]");
+    if (!data.expenses.length)  data.expenses  = JSON.parse(localStorage.getItem("acc_expenses")||"[]");
+    if (!data.salaries.length)  data.salaries  = JSON.parse(localStorage.getItem("acc_salary_payments")||"[]");
+    if (!data.activity.length)  data.activity  = JSON.parse(localStorage.getItem("acc_activity_log")||"[]");
+
+    data.settings  = JSON.parse(localStorage.getItem("pos_app_settings")||"null");
+    data.customize = JSON.parse(localStorage.getItem("pos_customize")||"null");
+    data.localUsers = getUsers().map(function(u){ return {id:u.id,username:u.username,name:u.name,role:u.role}; });
+
+    var blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+    var a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "webora-full-backup-" + new Date().toISOString().slice(0,10) + ".json";
+    a.click();
+    toast("✓ تم تصدير النسخة الاحتياطية الشاملة", "success");
+    if (typeof logActivity === "function") logActivity("system", "تصدير نسخة احتياطية شاملة", data.source==="supabase"?"من Supabase":"محلي");
+    if (btn) { btn.disabled=false; btn.textContent="تصدير نسخة احتياطية شاملة"; }
+  }
+  window.exportFullBackup = exportFullBackup;
+</script>
+    <script src="js/auto-updater-ui.js"></script>
+    <!-- إصلاح: نُقل هذا الكود من خارج </html> إلى داخل <body> -->
+    <script>
+    (function(){
+      document.addEventListener("DOMContentLoaded", function(){
+        var el = document.getElementById("current-mode-label");
+        if (el && typeof getAppModeLabel === "function") {
+          el.textContent = getAppModeLabel();
+        }
+      });
+    })();
+    </script>
+
+<script src="js/shortcuts.js"></script>
+<script>
+(function(){
+  if (window.electronAPI && window.electronAPI.isDesktop) {
+    var card = document.getElementById('shortcuts-card');
+    if (card) card.style.display = '';
+    if (typeof renderShortcutGrid === 'function') renderShortcutGrid();
+  }
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,781 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>التخصيص — WeB Ora</title>
+  <link rel="icon" type="image/png" href="img/mark.png">
+  <link rel="stylesheet" href="css/style.css">
+  <script src="config.js"></script>
+  <script src="js/mode-manager.js"></script>
+  <script src="js/supabase.min.js"></script>
+  <script src="js/auth.js"></script>
+  <script src="js/seclog.js"></script>
+  <script src="js/currency.js"></script>
+  <script src="js/db.js"></script>
+  <script src="js/sync_queue.js"></script>
+  <script src="js/notifications.js"></script>
+  <script src="js/initial_sync.js"></script>
+  <script src="js/sync_replay.js"></script>
+    <script src="js/background_sync.js"></script>
+  <script src="js/queue.js"></script>
+  <script src="js/online.js"></script>
+  <script src="js/layout.js"></script>
+  <script src="js/nav-extend.js"></script>
+  <script src="js/print.js"></script>
+  <script src="js/jsbarcode.min.js"></script>
+  <script src="js/silent-print.js"></script>
+  <style>
+    /* ─── Layout ─── */
+    .cz-shell { display:grid; grid-template-columns: 220px 1fr 420px; gap:20px; align-items:start; }
+    @media (max-width: 1280px){ .cz-shell { grid-template-columns: 200px 1fr; } .cz-preview { grid-column: 1 / -1; } }
+    @media (max-width: 860px) { .cz-shell { grid-template-columns: 1fr; } .cz-tabs-vert { display:none; } .cz-tabs-horiz { display:flex; } }
+    .cz-tabs-horiz { display:none; gap:6px; overflow-x:auto; padding-bottom:6px; margin-bottom:10px; }
+    .cz-tabs-horiz .cz-tab { white-space:nowrap; padding:8px 14px; border-radius:999px; font-size:13px; font-weight:600; border:1px solid var(--border); background:var(--card); cursor:pointer; flex-shrink:0; }
+    .cz-tabs-vert { position:sticky; top:20px; display:flex; flex-direction:column; gap:4px; background:var(--card); border:1px solid var(--border); border-radius:var(--radius); padding:10px; }
+    .cz-tab { display:flex; align-items:center; gap:10px; padding:10px 12px; border-radius:8px; cursor:pointer; font-size:14px; font-weight:600; color:var(--text-muted); border:0; background:transparent; text-align:right; width:100%; }
+    .cz-tab:hover { background:var(--primary-soft); color:var(--text); }
+    .cz-tab.active { background:var(--primary); color:#fff; }
+    .cz-tab svg { width:18px; height:18px; flex-shrink:0; }
+    .cz-section { display:none; }
+    .cz-section.active { display:block; animation:fadeIn .2s ease; }
+    @keyframes fadeIn { from { opacity:0; transform:translateY(4px); } to { opacity:1; transform:none; } }
+
+    /* ─── Cards & grids ─── */
+    .tmpl-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(160px,1fr)); gap:14px; margin-top:10px; }
+    .tmpl-card { border:2px solid var(--border); border-radius:var(--radius); padding:12px; cursor:pointer; transition:.2s; text-align:center; }
+    .tmpl-card:hover { border-color:var(--primary); transform:translateY(-2px); box-shadow:0 4px 16px rgba(0,0,0,.08); }
+    .tmpl-card.active { border-color:var(--primary); background:var(--primary-soft); }
+    .tmpl-card .tmpl-thumb { height:80px; border-radius:6px; margin-bottom:8px; overflow:hidden; border:1px solid var(--border); background:#fff; display:flex; align-items:stretch; }
+    .tmpl-card .tmpl-name  { font-size:13px; font-weight:700; }
+    .tmpl-card .tmpl-desc  { font-size:11px; color:var(--text-muted); margin-top:2px; }
+    .paper-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(130px,1fr)); gap:10px; margin-top:10px; }
+    .paper-btn  { border:2px solid var(--border); border-radius:var(--radius); padding:10px; cursor:pointer; text-align:center; transition:.2s; background:var(--card); }
+    .paper-btn:hover  { border-color:var(--primary); }
+    .paper-btn.active { border-color:var(--primary); background:var(--primary-soft); }
+    .paper-btn .paper-name { font-size:13px; font-weight:700; }
+    .paper-btn .paper-dim  { font-size:11px; color:var(--text-muted); margin-top:2px; }
+    .scan-toggle { display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-top:10px; }
+    .scan-opt    { border:2px solid var(--border); border-radius:var(--radius); padding:16px; cursor:pointer; text-align:center; transition:.2s; }
+    .scan-opt:hover  { border-color:var(--primary); }
+    .scan-opt.active { border-color:var(--primary); background:var(--primary-soft); }
+    .scan-opt svg   { display:block; margin:0 auto 8px; }
+    .scan-opt .scan-name { font-size:13px; font-weight:700; }
+    .scan-opt .scan-desc { font-size:11px; color:var(--text-muted); margin-top:4px; }
+
+    /* ─── Color block ─── */
+    .swatch-row { display:flex; flex-wrap:wrap; gap:8px; margin-bottom:14px; }
+    .swatch { width:32px; height:32px; border-radius:50%; cursor:pointer; border:3px solid transparent; transition:.15s; }
+    .swatch:hover, .swatch.active { border-color:#111; transform:scale(1.15); }
+    .color-row { display:grid; grid-template-columns:1fr 1fr; gap:14px; }
+    @media (max-width:600px){ .color-row { grid-template-columns:1fr; } }
+    .color-pick { display:flex; gap:8px; align-items:center; }
+    .color-pick input[type=color] { width:44px; height:36px; border:none; background:none; cursor:pointer; padding:0; border-radius:6px; }
+
+    /* ─── Logo ─── */
+    .logo-upload-area { border:2px dashed var(--border); border-radius:var(--radius); padding:20px; text-align:center; cursor:pointer; transition:.2s; }
+    .logo-upload-area:hover { border-color:var(--primary); background:var(--primary-soft); }
+    #logo-preview { max-height:120px; max-width:240px; object-fit:contain; margin-top:8px; border-radius:6px; }
+    .logo-actions { display:flex; gap:8px; flex-wrap:wrap; margin-top:12px; }
+
+    /* ─── Preview pane ─── */
+    .cz-preview { position:sticky; top:20px; }
+    .cz-preview .card { padding:14px; }
+    .cz-preview-frame { background:#f6f7f9; border-radius:var(--radius); padding:16px; overflow:auto; max-height:70vh; }
+    .cz-paper-info { font-size:11px; color:var(--text-muted); margin-top:8px; text-align:center; }
+
+    /* ─── Sliders ─── */
+    .slider-row { display:flex; gap:10px; align-items:center; }
+    .slider-row input[type=range] { flex:1; }
+    .slider-value { font-weight:700; min-width:46px; text-align:center; background:var(--primary-soft); color:var(--primary); padding:3px 8px; border-radius:6px; font-size:12px; }
+
+    /* ─── Save bar ─── */
+    .save-bar { position:sticky; top:0; z-index:50; background:var(--bg); padding:10px 0; margin:-10px 0 14px; border-bottom:1px solid var(--border); display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
+    .save-status { font-size:12px; color:var(--text-muted); }
+    .save-status.saved { color:#047857; }
+    .save-status.dirty { color:#b45309; }
+  </style>
+  <script src="js/refresh-btn.js"></script>
+</head>
+<body>
+<div id="page">
+  <div class="page-head">
+    <div>
+      <h1>التخصيص</h1>
+      <p>إعدادات احترافية للفاتورة، الطباعة، الشعار، الألوان والخطوط</p>
+    </div>
+  </div>
+
+  <div class="save-bar">
+    <button class="btn btn-primary" onclick="saveAll()">
+      <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/></svg>
+      حفظ جميع الإعدادات
+    </button>
+    <button class="btn btn-outline" onclick="resetAll()">إعادة التعيين</button>
+    <button class="btn btn-outline" onclick="printPreview()">طباعة تجريبية</button>
+    <span class="save-status" id="save-status">جاهز</span>
+  </div>
+
+  <div class="cz-shell" id="cz-shell">
+
+    <!-- ─── Vertical tabs (desktop) ─── -->
+    <nav class="cz-tabs-vert" id="tabs-vert"></nav>
+
+    <!-- ─── Main content ─── -->
+    <div>
+      <!-- Horizontal tabs (mobile) -->
+      <div class="cz-tabs-horiz" id="tabs-horiz"></div>
+
+      <!-- General -->
+      <div class="cz-section active" data-sec="general">
+        <div class="card">
+          <h2>بيانات الشركة</h2>
+          <div class="form-row">
+            <div class="field"><label>اسم الشركة</label><input class="input cz-live" id="c-name" placeholder="WeB Ora"></div>
+            <div class="field"><label>رقم الهاتف</label><input class="input cz-live" id="c-phone" style="direction:ltr" placeholder="+966 5x xxxx xxxx"></div>
+          </div>
+          <div class="form-row">
+            <div class="field"><label>العنوان</label><input class="input cz-live" id="c-address" placeholder="الرياض، المملكة العربية السعودية"></div>
+            <div class="field"><label>البريد الإلكتروني</label><input class="input cz-live" id="c-email" style="direction:ltr" placeholder="info@company.com"></div>
+          </div>
+          <div class="form-row">
+            <div class="field"><label>رقم التسجيل الضريبي (VAT)</label><input class="input cz-live" id="c-tax" style="direction:ltr" placeholder="30xxxxxxxxxxxxxxxxx15"></div>
+            <div class="field"><label>نص تذييل الفاتورة</label><input class="input cz-live" id="c-footer" placeholder="شكراً لتعاملكم معنا"></div>
+          </div>
+        </div>
+
+        <div class="card">
+          <h2>وضع الماسح الضوئي</h2>
+          <div class="scan-toggle">
+            <div class="scan-opt" id="scan-barcode" onclick="setScanMode('barcode')">
+              <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 5v4"/><path d="M3 11v2"/><path d="M3 17v2"/><path d="M7 5v14"/><path d="M11 5v4"/><path d="M11 11v2"/><path d="M11 17v2"/><path d="M15 5v14"/><path d="M19 5v4"/><path d="M19 11v2"/><path d="M19 17v2"/></svg>
+              <div class="scan-name">باركود خطي</div>
+              <div class="scan-desc">EAN · Code128 · UPC</div>
+            </div>
+            <div class="scan-opt" id="scan-qr" onclick="setScanMode('qr')">
+              <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+              <div class="scan-name">QR كود</div>
+              <div class="scan-desc">QR · DataMatrix · Aztec</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Print -->
+      <div class="cz-section" data-sec="print">
+        <div class="card">
+          <h2>حجم الورق</h2>
+          <p class="text-muted" style="font-size:12px">تغيير حجم الورقة <strong>لا يؤثر</strong> على حجم الخط أو العناصر — فقط أبعاد الورقة.</p>
+          <div class="paper-grid" id="paper-grid"></div>
+        </div>
+        <div class="card">
+          <h2>اتجاه الطباعة</h2>
+          <div class="scan-toggle">
+            <div class="scan-opt" id="orient-portrait" onclick="setOrient('portrait')">
+              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="6" y="3" width="12" height="18" rx="1"/></svg>
+              <div class="scan-name">عمودي</div>
+            </div>
+            <div class="scan-opt" id="orient-landscape" onclick="setOrient('landscape')">
+              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="6" width="18" height="12" rx="1"/></svg>
+              <div class="scan-name">أفقي</div>
+            </div>
+          </div>
+        </div>
+        <div class="card">
+          <h2>خيارات الطباعة</h2>
+          <div style="display:flex;flex-direction:column;gap:10px">
+            <label style="display:flex;align-items:center;gap:10px;cursor:pointer"><input type="checkbox" id="p-showbarcode" class="cz-live"> طباعة باركود رقم الفاتورة</label>
+            <label style="display:flex;align-items:center;gap:10px;cursor:pointer"><input type="checkbox" id="p-showcustomer" class="cz-live" checked> طباعة بيانات العميل</label>
+            <label style="display:flex;align-items:center;gap:10px;cursor:pointer"><input type="checkbox" id="p-shownotes" class="cz-live" checked> طباعة الملاحظات</label>
+            <label style="display:flex;align-items:center;gap:10px;cursor:pointer"><input type="checkbox" id="p-showtax" class="cz-live"> إظهار رقم التسجيل الضريبي على الفاتورة</label>
+          </div>
+        </div>
+      </div>
+
+      <!-- Invoice template -->
+      <div class="cz-section" data-sec="invoice">
+        <div class="card">
+          <h2>تصميم الفاتورة</h2>
+          <div class="tmpl-grid" id="tmpl-grid"></div>
+        </div>
+      </div>
+
+      <!-- Logo -->
+      <div class="cz-section" data-sec="logo">
+        <div class="card">
+          <h2>شعار الشركة</h2>
+          <div class="logo-upload-area" onclick="document.getElementById('logo-input').click()">
+            <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="opacity:.4;margin-bottom:6px"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+            <div style="font-size:13px;color:var(--text-muted)">انقر لرفع شعار الشركة (PNG/JPG · حد أقصى 300KB)</div>
+            <img id="logo-preview" src="" style="display:none">
+          </div>
+          <input type="file" id="logo-input" accept="image/*" style="display:none" onchange="loadLogo(this)">
+          <div class="logo-actions">
+            <button class="btn btn-outline btn-sm" onclick="document.getElementById('logo-input').click()">استبدال الشعار</button>
+            <button class="btn btn-outline btn-sm" id="btn-remove-logo" onclick="removeLogo()" style="color:#b91c1c">حذف الشعار</button>
+            <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;margin-right:auto">
+              <input type="checkbox" id="c-showlogo" class="cz-live"> إظهار الشعار في الفاتورة
+            </label>
+          </div>
+          <div style="margin-top:14px">
+            <label style="font-size:13px;font-weight:600">حجم الشعار في الفاتورة</label>
+            <div class="slider-row" style="margin-top:6px">
+              <input type="range" id="c-logosize" class="cz-live" min="40" max="200" step="5" value="80">
+              <span class="slider-value" id="logosize-val">80px</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Colors -->
+      <div class="cz-section" data-sec="colors">
+        <div class="card">
+          <h2>ألوان النظام</h2>
+          <div class="color-row">
+            <div>
+              <label style="font-size:13px;font-weight:600">اللون الأساسي</label>
+              <div class="swatch-row" id="swatch-row" style="margin-top:8px"></div>
+              <div class="color-pick">
+                <input type="color" id="c-color" oninput="onColorInput(this.value)">
+                <input class="input cz-live" id="c-colorhex" style="direction:ltr;flex:1" placeholder="#F57C20" oninput="onColorHex(this.value)">
+              </div>
+            </div>
+            <div>
+              <label style="font-size:13px;font-weight:600">اللون الثانوي</label>
+              <div class="color-pick" style="margin-top:8px">
+                <input type="color" id="c-color2" class="cz-live">
+                <input class="input cz-live" id="c-color2hex" style="direction:ltr;flex:1" placeholder="#6B7280">
+              </div>
+            </div>
+            <div>
+              <label style="font-size:13px;font-weight:600">لون الأزرار</label>
+              <div class="color-pick" style="margin-top:8px">
+                <input type="color" id="c-colorbtn" class="cz-live">
+                <input class="input cz-live" id="c-colorbtnhex" style="direction:ltr;flex:1" placeholder="#F57C20">
+              </div>
+            </div>
+            <div>
+              <label style="font-size:13px;font-weight:600">لون العناوين</label>
+              <div class="color-pick" style="margin-top:8px">
+                <input type="color" id="c-colorhead" class="cz-live">
+                <input class="input cz-live" id="c-colorheadhex" style="direction:ltr;flex:1" placeholder="#111827">
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Fonts -->
+      <div class="cz-section" data-sec="fonts">
+        <div class="card">
+          <h2>إعدادات الخط</h2>
+          <div class="form-row">
+            <div class="field">
+              <label>نوع الخط</label>
+              <select class="input cz-live" id="c-font">
+                <option value="Cairo">Cairo (افتراضي)</option>
+                <option value="Tajawal">Tajawal</option>
+                <option value="Almarai">Almarai</option>
+                <option value="IBM Plex Sans Arabic">IBM Plex Sans Arabic</option>
+                <option value="Noto Naskh Arabic">Noto Naskh Arabic</option>
+                <option value="Amiri">Amiri (تقليدي)</option>
+              </select>
+            </div>
+            <div class="field">
+              <label>وزن الخط</label>
+              <select class="input cz-live" id="c-fontweight">
+                <option value="400">عادي (400)</option>
+                <option value="500">متوسط (500)</option>
+                <option value="600">شبه عريض (600)</option>
+                <option value="700" selected>عريض (700)</option>
+                <option value="800">عريض جداً (800)</option>
+              </select>
+            </div>
+          </div>
+          <div>
+            <label style="font-size:13px;font-weight:600">حجم الخط الأساسي</label>
+            <div class="slider-row" style="margin-top:6px">
+              <input type="range" id="c-fontsize" class="cz-live" min="10" max="20" step="1" value="13">
+              <span class="slider-value" id="fontsize-val">13px</span>
+            </div>
+          </div>
+          <p class="text-muted" style="font-size:12px;margin-top:10px">يُطبَّق على الفواتير، الإيصالات، والتقارير المطبوعة.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- ─── Live Preview ─── -->
+    <div class="cz-preview">
+      <div class="card">
+        <div class="flex-between" style="margin-bottom:12px">
+          <h2 style="margin-bottom:0;font-size:14px">معاينة مباشرة</h2>
+          <button class="btn btn-outline btn-sm" onclick="refreshPreview()">تحديث</button>
+        </div>
+        <div class="cz-preview-frame">
+          <div id="preview-inner"></div>
+        </div>
+        <div class="cz-paper-info" id="paper-info"></div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+  renderLayout("customize");
+
+  /* ═════════════════════════════════════════════
+     الإعدادات الافتراضية الموسعة
+     ═════════════════════════════════════════════ */
+  var DEFAULTS = {
+    companyName:"", companyPhone:"", companyAddress:"", companyEmail:"",
+    taxNumber:"", primaryColor:"#F57C20", secondaryColor:"#6B7280",
+    buttonColor:"#F57C20", headingColor:"#111827",
+    invoiceTemplate:"classic", paperSize:"a4", orientation:"portrait",
+    invoiceFooter:"شكراً لتعاملكم معنا",
+    showLogo:true, logoData:"", logoSize:80,
+    scanMode:"barcode",
+    fontFamily:"Cairo", fontSize:13, fontWeight:"700",
+    showBarcode:false, showCustomer:true, showNotes:true, showTax:false
+  };
+
+  /* قراءة الإعدادات: localStorage + دمج مع defaults */
+  var CS = Object.assign({}, DEFAULTS, (typeof getCustomSettings==="function" ? getCustomSettings() : {}));
+
+  /* ═════════════════════════════════════════════
+     طبقة الحفظ السحابية (Supabase app_settings)
+     ═════════════════════════════════════════════ */
+  async function loadCloud() {
+    try {
+      if (typeof SB === "undefined" || !SB) return;
+      var r = await SB.from("app_settings").select("value").eq("key","customize").maybeSingle();
+      if (r && r.data && r.data.value) {
+        CS = Object.assign({}, DEFAULTS, CS, r.data.value);
+        fillFields();
+        applyLivePrimary();
+        refreshPreview();
+        setStatus("تم تحميل الإعدادات من الخادم", "saved");
+      }
+    } catch (e) { /* بدون اتصال — لا بأس */ }
+  }
+  async function saveCloud(settings) {
+    try {
+      if (typeof SB === "undefined" || !SB) return false;
+      var r = await SB.from("app_settings").upsert({ key:"customize", value:settings }, { onConflict:"key" });
+      return !r.error;
+    } catch(e) { return false; }
+  }
+
+  /* ═════════════════════════════════════════════
+     معطيات الواجهة
+     ═════════════════════════════════════════════ */
+  var TABS = [
+    { id:"general",  name:"عام",         icon:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06A2 2 0 1 1 4.29 16.96l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06A2 2 0 1 1 7.04 4.29l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>' },
+    { id:"print",    name:"الطباعة",     icon:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>' },
+    { id:"invoice",  name:"الفاتورة",    icon:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>' },
+    { id:"logo",     name:"الشعار",      icon:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>' },
+    { id:"colors",   name:"الألوان",     icon:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="13.5" cy="6.5" r=".5"/><circle cx="17.5" cy="10.5" r=".5"/><circle cx="8.5" cy="7.5" r=".5"/><circle cx="6.5" cy="12.5" r=".5"/><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 0 1 1.668-1.668h1.996c3.051 0 5.555-2.503 5.555-5.554C21.965 6.012 17.461 2 12 2z"/></svg>' },
+    { id:"fonts",    name:"الخطوط",      icon:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="4 7 4 4 20 4 20 7"/><line x1="9" y1="20" x2="15" y2="20"/><line x1="12" y1="4" x2="12" y2="20"/></svg>' },
+  ];
+
+  var SWATCHES = ["#F57C20","#E53E3E","#D69E2E","#38A169","#3182CE","#805AD5","#D53F8C","#2D3748","#718096","#1A202C"];
+
+  var TEMPLATES = [
+    { id:"classic", name:"كلاسيكي", desc:"تصميم خط عريض",
+      thumb:'<div style="width:100%;height:100%;padding:6px 8px;box-sizing:border-box"><div style="border-bottom:3px solid var(--clr);padding-bottom:4px;margin-bottom:4px"><div style="font-size:9px;font-weight:800;color:var(--clr)">WeB Ora</div></div><div style="font-size:7px;color:#aaa">رقم: WB-001</div><div style="height:1px;background:#eee;margin:4px 0"></div><div style="font-size:7px;color:#444">منتج × 2 ........ 50$</div><div style="font-size:7px;color:#444">منتج × 1 ........ 25$</div><div style="height:1px;background:#eee;margin:4px 0"></div><div style="font-size:8px;font-weight:800;color:var(--clr);text-align:left">75.00 $</div></div>' },
+    { id:"modern",  name:"حديث",   desc:"بلوك ملوّن في الرأس",
+      thumb:'<div style="width:100%;height:100%;box-sizing:border-box"><div style="background:var(--clr);padding:6px 8px"><div style="font-size:9px;font-weight:800;color:#fff">WeB Ora</div><div style="font-size:7px;color:rgba(255,255,255,.8)">WB-001</div></div><div style="padding:4px 8px"><div style="font-size:7px;color:#444">منتج × 2 ........ 50$</div><div style="font-size:7px;color:#444">منتج × 1 ........ 25$</div><div style="font-size:8px;font-weight:800;color:var(--clr);text-align:left;margin-top:4px">75.00 $</div></div></div>' },
+    { id:"thermal", name:"حراري",  desc:"ضيق · للطابعات الحرارية",
+      thumb:'<div style="width:100%;height:100%;padding:6px;box-sizing:border-box;text-align:center"><div style="font-size:10px;font-weight:800;color:var(--clr)">WeB Ora</div><div style="border-top:1px dashed #aaa;border-bottom:1px dashed #aaa;margin:3px 0;padding:3px 0;font-size:7px;color:#444">WB-001 · التاريخ</div><div style="font-size:7px;color:#444">منتج × 2 ..... 50$</div><div style="font-size:7px;color:#444">منتج × 1 ..... 25$</div><div style="font-size:9px;font-weight:800;margin-top:3px">75.00 $</div></div>' }
+  ];
+
+  var PAPERS = [
+    {id:"a4",        name:"A4",         dim:"210 × 297 مم"},
+    {id:"a5",        name:"A5",         dim:"148 × 210 مم"},
+    {id:"thermal80", name:"حراري 80mm", dim:"عرض 80 مم"},
+    {id:"thermal58", name:"حراري 58mm", dim:"عرض 58 مم"}
+  ];
+
+  /* ═════════════════════════════════════════════
+     بناء واجهة التبويبات
+     ═════════════════════════════════════════════ */
+  function buildTabs() {
+    var v = "", h = "";
+    TABS.forEach(function(t){
+      v += '<button class="cz-tab'+(t.id==="general"?" active":"")+'" data-tab="'+t.id+'" onclick="setTab(\''+t.id+'\')">'+
+           '<span style="width:18px;height:18px;display:flex">'+t.icon+'</span><span>'+t.name+'</span></button>';
+      h += '<button class="cz-tab'+(t.id==="general"?" active":"")+'" data-tab="'+t.id+'" onclick="setTab(\''+t.id+'\')">'+t.name+'</button>';
+    });
+    document.getElementById("tabs-vert").innerHTML  = v;
+    document.getElementById("tabs-horiz").innerHTML = h;
+  }
+  function setTab(id) {
+    document.querySelectorAll(".cz-tab").forEach(function(el){ el.classList.toggle("active", el.dataset.tab===id); });
+    document.querySelectorAll(".cz-section").forEach(function(el){ el.classList.toggle("active", el.dataset.sec===id); });
+  }
+  window.setTab = setTab;
+
+  /* ═════════════════════════════════════════════
+     واجهات الاختيار
+     ═════════════════════════════════════════════ */
+  function buildSwatches() {
+    var html = "";
+    SWATCHES.forEach(function(c){
+      html += '<div class="swatch'+(CS.primaryColor===c?" active":"")+'" style="background:'+c+'" onclick="onColorInput(\''+c+'\')"></div>';
+    });
+    document.getElementById("swatch-row").innerHTML = html;
+  }
+  function buildTemplates() {
+    var color = CS.primaryColor||"#F57C20";
+    var html = "";
+    TEMPLATES.forEach(function(t){
+      html += '<div class="tmpl-card'+(CS.invoiceTemplate===t.id?" active":"")+'" onclick="setTemplate(\''+t.id+'\')">'+
+        '<div class="tmpl-thumb">'+ t.thumb.replace(/var\(--clr\)/g, color) +'</div>'+
+        '<div class="tmpl-name">'+t.name+'</div>'+
+        '<div class="tmpl-desc">'+t.desc+'</div></div>';
+    });
+    document.getElementById("tmpl-grid").innerHTML = html;
+  }
+  function buildPapers() {
+    var html = "";
+    PAPERS.forEach(function(p){
+      html += '<div class="paper-btn'+(CS.paperSize===p.id?" active":"")+'" onclick="setPaper(\''+p.id+'\')">'+
+        '<div class="paper-name">'+p.name+'</div>'+
+        '<div class="paper-dim">'+p.dim+'</div></div>';
+    });
+    document.getElementById("paper-grid").innerHTML = html;
+  }
+  function buildScanMode() {
+    document.getElementById("scan-barcode").className = "scan-opt"+(CS.scanMode!=="qr"?" active":"");
+    document.getElementById("scan-qr").className      = "scan-opt"+(CS.scanMode==="qr"?" active":"");
+  }
+  function buildOrient() {
+    document.getElementById("orient-portrait").className  = "scan-opt"+(CS.orientation!=="landscape"?" active":"");
+    document.getElementById("orient-landscape").className = "scan-opt"+(CS.orientation==="landscape"?" active":"");
+  }
+
+  /* ═════════════════════════════════════════════
+     تعبئة الحقول
+     ═════════════════════════════════════════════ */
+  function fillFields() {
+    var set = function(id, val){ var el=document.getElementById(id); if(el && el.type!=="checkbox") el.value=(val==null?"":val); else if(el) el.checked=!!val; };
+    set("c-name",    CS.companyName);
+    set("c-phone",   CS.companyPhone);
+    set("c-address", CS.companyAddress);
+    set("c-email",   CS.companyEmail);
+    set("c-tax",     CS.taxNumber);
+    set("c-footer",  CS.invoiceFooter);
+    set("c-showlogo",CS.showLogo);
+    set("c-logosize",CS.logoSize);
+    set("c-color",       CS.primaryColor);
+    set("c-colorhex",    CS.primaryColor);
+    set("c-color2",      CS.secondaryColor);
+    set("c-color2hex",   CS.secondaryColor);
+    set("c-colorbtn",    CS.buttonColor);
+    set("c-colorbtnhex", CS.buttonColor);
+    set("c-colorhead",   CS.headingColor);
+    set("c-colorheadhex",CS.headingColor);
+    set("c-font",        CS.fontFamily);
+    set("c-fontweight",  CS.fontWeight);
+    set("c-fontsize",    CS.fontSize);
+    set("p-showbarcode", CS.showBarcode);
+    set("p-showcustomer",CS.showCustomer);
+    set("p-shownotes",   CS.showNotes);
+    set("p-showtax",     CS.showTax);
+    document.getElementById("logosize-val").textContent = (CS.logoSize||80)+"px";
+    document.getElementById("fontsize-val").textContent = (CS.fontSize||13)+"px";
+    if (CS.logoData) {
+      var img = document.getElementById("logo-preview");
+      img.src = CS.logoData; img.style.display="block";
+    } else {
+      document.getElementById("logo-preview").style.display="none";
+    }
+    buildSwatches();
+    buildTemplates();
+    buildPapers();
+    buildScanMode();
+    buildOrient();
+  }
+
+  /* ═════════════════════════════════════════════
+     معالجات تغيير
+     ═════════════════════════════════════════════ */
+  function onColorInput(val) {
+    CS.primaryColor = val;
+    document.getElementById("c-color").value    = val;
+    document.getElementById("c-colorhex").value = val;
+    document.querySelectorAll(".swatch").forEach(function(el){
+      el.classList.toggle("active", el.style.background===val || el.style.backgroundColor===val || rgbToHex(el.style.backgroundColor)===val.toLowerCase());
+    });
+    buildTemplates();
+    applyLivePrimary();
+    markDirty();
+    refreshPreview();
+  }
+  function onColorHex(val) {
+    if (/^#[0-9a-f]{6}$/i.test(val)) onColorInput(val);
+  }
+  function rgbToHex(rgb) {
+    var m = (rgb||"").match(/^rgb\((\d+),\s*(\d+),\s*(\d+)\)$/);
+    if (!m) return rgb;
+    return "#" + [1,2,3].map(function(i){ return parseInt(m[i]).toString(16).padStart(2,"0"); }).join("");
+  }
+  function setTemplate(id) { CS.invoiceTemplate=id; buildTemplates(); markDirty(); refreshPreview(); }
+  function setPaper(id)    { CS.paperSize=id;       buildPapers();    markDirty(); refreshPreview(); }
+  function setScanMode(m)  { CS.scanMode=m;         buildScanMode();  markDirty(); }
+  function setOrient(o)    { CS.orientation=o;      buildOrient();    markDirty(); refreshPreview(); }
+  window.onColorInput=onColorInput; window.onColorHex=onColorHex;
+  window.setTemplate=setTemplate; window.setPaper=setPaper;
+  window.setScanMode=setScanMode; window.setOrient=setOrient;
+
+  function loadLogo(input) {
+    var file = input.files[0]; if (!file) return;
+    if (file.size > 300000) { toast("حجم الشعار كبير جداً — الحد 300KB","error"); return; }
+    var reader = new FileReader();
+    reader.onload = function(e){
+      CS.logoData = e.target.result;
+      var img = document.getElementById("logo-preview");
+      img.src = e.target.result; img.style.display="block";
+      markDirty();
+      refreshPreview();
+    };
+    reader.readAsDataURL(file);
+  }
+  function removeLogo() {
+    if (!CS.logoData) { toast("لا يوجد شعار","error"); return; }
+    if (!confirm("حذف الشعار؟")) return;
+    CS.logoData = "";
+    document.getElementById("logo-preview").style.display="none";
+    document.getElementById("logo-input").value = "";
+    markDirty(); refreshPreview();
+  }
+  window.loadLogo=loadLogo; window.removeLogo=removeLogo;
+
+  /* ═════════════════════════════════════════════
+     جمع القيم من الحقول
+     ═════════════════════════════════════════════ */
+  function collectFromFields() {
+    var g = function(id){ var el=document.getElementById(id); return el ? (el.type==="checkbox"?el.checked:el.value) : null; };
+    CS.companyName    = (g("c-name")||"").trim();
+    CS.companyPhone   = (g("c-phone")||"").trim();
+    CS.companyAddress = (g("c-address")||"").trim();
+    CS.companyEmail   = (g("c-email")||"").trim();
+    CS.taxNumber      = (g("c-tax")||"").trim();
+    CS.invoiceFooter  = (g("c-footer")||"").trim() || "شكراً لتعاملكم معنا";
+    CS.showLogo       = !!g("c-showlogo");
+    CS.logoSize       = parseInt(g("c-logosize")||"80", 10);
+    CS.primaryColor   = g("c-colorhex") || CS.primaryColor;
+    CS.secondaryColor = g("c-color2hex")   || g("c-color2")   || CS.secondaryColor;
+    CS.buttonColor    = g("c-colorbtnhex") || g("c-colorbtn") || CS.buttonColor;
+    CS.headingColor   = g("c-colorheadhex")|| g("c-colorhead")|| CS.headingColor;
+    CS.fontFamily     = g("c-font") || "Cairo";
+    CS.fontWeight     = g("c-fontweight") || "700";
+    CS.fontSize       = parseInt(g("c-fontsize")||"13", 10);
+    CS.showBarcode    = !!g("p-showbarcode");
+    CS.showCustomer   = !!g("p-showcustomer");
+    CS.showNotes      = !!g("p-shownotes");
+    CS.showTax        = !!g("p-showtax");
+  }
+
+  /* ═════════════════════════════════════════════
+     المعاينة المباشرة
+     ═════════════════════════════════════════════ */
+  function refreshPreview() {
+    collectFromFields();
+    document.getElementById("logosize-val").textContent = CS.logoSize+"px";
+    document.getElementById("fontsize-val").textContent = CS.fontSize+"px";
+    /* sync color text fields */
+    document.getElementById("c-color").value       = CS.primaryColor;
+    document.getElementById("c-color2hex").value   = CS.secondaryColor; document.getElementById("c-color2").value   = CS.secondaryColor;
+    document.getElementById("c-colorbtnhex").value = CS.buttonColor;    document.getElementById("c-colorbtn").value = CS.buttonColor;
+    document.getElementById("c-colorheadhex").value= CS.headingColor;   document.getElementById("c-colorhead").value= CS.headingColor;
+
+    var demo = {
+      invoiceNumber: "WB-20260101-1",
+      date: new Date().toISOString().slice(0,10),
+      paymentStatus: "مدفوع",
+      total: 175.50,
+      notes: "تجريبية للمعاينة",
+      customer: CS.showCustomer ? {phone:"0501234567", name:"أحمد محمد", address:"الرياض"} : null,
+      items: [
+        {productId:1, name:"هاتف ذكي سامسونج", price:120,   costPrice:90, quantity:1, total:120},
+        {productId:2, name:"سماعة لاسلكية",     price:35.5, costPrice:20, quantity:1, total:35.5},
+        {productId:3, name:"شاحن سريع 65W",     price:20,   costPrice:12, quantity:1, total:20}
+      ]
+    };
+
+    var origGetCS = window.getCustomSettings;
+    window.getCustomSettings = function(){ return CS; };
+    var html = (typeof buildInvoiceInnerHTML==="function") ? buildInvoiceInnerHTML(demo) : "<div>المعاينة غير متاحة</div>";
+    window.getCustomSettings = origGetCS;
+
+    var paperW = (typeof PAPER_WIDTHS!=="undefined" && PAPER_WIDTHS[CS.paperSize]) || "740px";
+    var inner = document.getElementById("preview-inner");
+    inner.style.cssText =
+      "font-family:'"+CS.fontFamily+"',Cairo,sans-serif;"+
+      "font-size:"+CS.fontSize+"px;"+
+      "font-weight:"+CS.fontWeight+";"+
+      "direction:rtl;background:#fff;padding:20px 24px;color:"+CS.headingColor+";"+
+      "max-width:"+paperW+";margin:auto;border-radius:6px;box-shadow:0 2px 12px rgba(0,0,0,.1)";
+    inner.innerHTML = html;
+
+    var p = PAPERS.find(function(x){return x.id===CS.paperSize;});
+    document.getElementById("paper-info").textContent = p ? (p.name + " · " + p.dim + (CS.orientation==="landscape" ? " · أفقي" : "")) : "";
+  }
+  window.refreshPreview = refreshPreview;
+
+  /* تطبيق الإعدادات المرئية على الواجهة الرئيسية فوراً */
+  function applyLivePrimary() {
+    var r = document.documentElement;
+    /* اللون الأساسي + RGB */
+    r.style.setProperty("--primary", CS.primaryColor||"#F57C20");
+    var hex = (CS.primaryColor||"#F57C20").replace("#","");
+    var R = parseInt(hex.substr(0,2),16)||245, G = parseInt(hex.substr(2,2),16)||124, B = parseInt(hex.substr(4,2),16)||32;
+    r.style.setProperty("--primary-rgb", R+","+G+","+B);
+    /* اللون الثانوي */
+    if (CS.secondaryColor) r.style.setProperty("--text-muted", CS.secondaryColor);
+    /* حجم الخط على الصفحة كلها */
+    if (CS.fontSize && CS.fontSize > 0) {
+      document.body.style.fontSize = CS.fontSize + "px";
+      r.style.setProperty("--font-size-base", CS.fontSize+"px");
+    }
+    /* نوع الخط — تحميل من Google Fonts إذا لزم */
+    if (CS.fontFamily && CS.fontFamily !== "Cairo") {
+      var existingLink = document.getElementById("cz-font-link");
+      var fontMap = {
+        "Tajawal": "Tajawal:wght@400;500;700;800",
+        "Almarai": "Almarai:wght@400;700;800",
+        "IBM Plex Sans Arabic": "IBM+Plex+Sans+Arabic:wght@400;500;600;700",
+        "Noto Naskh Arabic": "Noto+Naskh+Arabic:wght@400;500;700",
+        "Amiri": "Amiri:wght@400;700"
+      };
+      var param = fontMap[CS.fontFamily];
+      if (param) {
+        var url = "https://fonts.googleapis.com/css2?family=" + param + "&display=swap";
+        if (!existingLink || existingLink.href !== url) {
+          if (existingLink) existingLink.remove();
+          var link = document.createElement("link");
+          link.id="cz-font-link"; link.rel="stylesheet"; link.href=url;
+          document.head.appendChild(link);
+        }
+      }
+      document.body.style.fontFamily = "'" + CS.fontFamily + "', Cairo, sans-serif";
+      r.style.setProperty("--font-family", "'" + CS.fontFamily + "', Cairo, sans-serif");
+    } else if (CS.fontFamily === "Cairo") {
+      document.body.style.fontFamily = "Cairo, sans-serif";
+      r.style.setProperty("--font-family", "Cairo, sans-serif");
+    }
+  }
+
+  /* ═════════════════════════════════════════════
+     الحفظ والتعيين
+     ═════════════════════════════════════════════ */
+  var saveStatusEl = document.getElementById("save-status");
+  function setStatus(msg, cls) { saveStatusEl.textContent = msg; saveStatusEl.className = "save-status "+(cls||""); }
+  function markDirty() {
+    setStatus("• تغييرات غير محفوظة (اضغط حفظ للمزامنة على جميع الأجهزة)", "dirty");
+    collectFromFields();
+    saveCustomSettings(CS);
+  }
+
+  async function saveAll() {
+    collectFromFields();
+    /* 1) localStorage (يدوم بعد إعادة فتح المتصفح) */
+    saveCustomSettings(CS);
+    applyLivePrimary();
+    /* تحديث اسم الشركة في الشريط الجانبي إذا تغير */
+    var brandEl = document.getElementById("brand-name-el");
+    if (brandEl && CS.companyName) brandEl.textContent = CS.companyName;
+    setStatus("جارٍ الحفظ في الخادم…", "");
+    /* 2) السحابة (يتزامن بين الأجهزة) */
+    var ok = await saveCloud(CS);
+    if (ok) {
+      setStatus("✓ تم الحفظ — متاح على جميع الأجهزة", "saved");
+      toast("تم حفظ جميع الإعدادات", "success");
+    } else {
+      setStatus("✓ تم الحفظ محلياً (سيُزامَن عند الاتصال)", "saved");
+      toast("تم الحفظ محلياً", "success");
+    }
+  }
+  window.saveAll = saveAll;
+
+  function resetAll() {
+    if (!confirm("إعادة كل الإعدادات إلى الافتراضي؟ (لن يحذف الشعار حتى تحفظ)")) return;
+    CS = Object.assign({}, DEFAULTS, { logoData: CS.logoData });
+    fillFields(); applyLivePrimary(); refreshPreview(); markDirty();
+  }
+  window.resetAll = resetAll;
+
+  function printPreview() {
+    collectFromFields();
+    var demo = {
+      invoiceNumber: "PREVIEW-001", date: new Date().toISOString().slice(0,10),
+      paymentStatus: "مدفوع", total: 175.50, notes:"معاينة طباعة",
+      customer: CS.showCustomer ? {phone:"0501234567", name:"أحمد محمد", address:"الرياض"} : null,
+      items: [
+        {productId:1, name:"منتج تجريبي 1", price:100, costPrice:60, quantity:1, total:100},
+        {productId:2, name:"منتج تجريبي 2", price:75.5, costPrice:40, quantity:1, total:75.5}
+      ]
+    };
+    var origGetCS = window.getCustomSettings;
+    window.getCustomSettings = function(){ return CS; };
+    try { if (typeof printInvoice==="function") printInvoice(demo); }
+    finally { window.getCustomSettings = origGetCS; }
+  }
+  window.printPreview = printPreview;
+
+  /* ═════════════════════════════════════════════
+     استماع موحّد لكل الحقول الحيّة
+     ═════════════════════════════════════════════ */
+  function bindLive() {
+    document.querySelectorAll(".cz-live").forEach(function(el){
+      var ev = (el.type==="checkbox" || el.tagName==="SELECT" || el.type==="color" || el.type==="range") ? "change" : "input";
+      el.addEventListener(ev, function(){
+        collectFromFields();
+        applyLivePrimary();
+        markDirty();
+        refreshPreview();
+      });
+      if (el.type==="range") el.addEventListener("input", function(){
+        collectFromFields();
+        applyLivePrimary();
+        markDirty();
+        refreshPreview();
+      });
+      /* ربط حقول الألوان بأخواتها */
+      if (el.type==="color" && el.id.indexOf("c-color")===0) {
+        var hexId = el.id+"hex";
+        el.addEventListener("input", function(){ var h=document.getElementById(hexId); if(h) h.value=el.value; });
+      }
+      if (el.id.endsWith("hex") && el.id.indexOf("c-color")===0) {
+        var colId = el.id.replace(/hex$/,"");
+        el.addEventListener("input", function(){
+          if (/^#[0-9a-f]{6}$/i.test(el.value)) { var c=document.getElementById(colId); if(c) c.value=el.value; }
+        });
+      }
+    });
+  }
+
+  /* ═════════════════════════════════════════════
+     تهيئة
+     ═════════════════════════════════════════════ */
+  buildTabs();
+  fillFields();
+  applyLivePrimary();
+  bindLive();
+  refreshPreview();
+  setStatus("جاهز", "");
+
+  /* تحميل من السحابة بعد ظهور الصفحة */
+  setTimeout(loadCloud, 300);
+
+  /* تحذير قبل المغادرة عند وجود تغييرات */
+  window.addEventListener("beforeunload", function(e){
+    if (saveStatusEl.classList.contains("dirty")) {
+      e.preventDefault(); e.returnValue = "";
+    }
+  });
+</script>
+    <script src="js/auto-updater-ui.js"></script>
+</body>
+</html>

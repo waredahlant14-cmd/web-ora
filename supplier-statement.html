@@ -1,0 +1,199 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>كشف حساب المورد — WeB Ora</title>
+  <link rel="icon" type="image/png" href="img/mark-glow.png">
+  <link rel="stylesheet" href="css/style.css">
+  <script src="config.js"></script>
+  <script src="js/mode-manager.js"></script>
+  <script src="js/supabase.min.js"></script>
+  <script src="js/auth.js"></script>
+  <script src="js/seclog.js"></script>
+  <script src="js/currency.js"></script>
+  <script src="js/db.js"></script>
+  <script src="js/sync_queue.js"></script>
+  <script src="js/notifications.js"></script>
+  <script src="js/initial_sync.js"></script>
+  <script src="js/background_sync.js"></script>
+  <script src="js/queue.js"></script>
+  <script src="js/online.js"></script>
+  <script src="js/layout.js"></script>
+  <script src="js/nav-extend.js"></script>
+  <script src="js/suppliers.js"></script>
+  <style>
+    .stmt-header { border-radius:var(--radius);padding:20px 24px;background:var(--card);border:1.5px solid var(--border);margin-bottom:20px;display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:16px }
+    .stmt-info h2 { margin:0 0 4px;font-size:20px }
+    .balance-badge { padding:12px 24px;border-radius:var(--radius);text-align:center;min-width:160px }
+    .balance-badge .lbl { font-size:12px;font-weight:700;margin-bottom:4px }
+    .balance-badge .val { font-size:28px;font-weight:900 }
+    .balance-pos { background:var(--red-light);border:1.5px solid #fca5a5 }
+    .balance-pos .val { color:var(--red) }
+    .balance-zero { background:var(--green-light);border:1.5px solid #86efac }
+    .balance-zero .val { color:var(--green) }
+    .entry-debit  { color:var(--red) }
+    .entry-credit { color:var(--green) }
+    @media print {
+      .no-print { display:none!important }
+      body { background:white!important }
+    }
+  </style>
+  <script src="js/refresh-btn.js"></script>
+</head>
+<body>
+<div id="page">
+  <div class="page-head no-print">
+    <h1>كشف حساب المورد</h1>
+    <p id="sup-sub" class="text-muted">جارٍ التحميل...</p>
+  </div>
+
+  <div style="display:flex;gap:10px;margin-bottom:20px;flex-wrap:wrap" class="no-print">
+    <a class="btn btn-outline" href="suppliers.html">← الموردون</a>
+    <a class="btn btn-outline" id="inv-link" href="#">الفواتير</a>
+    <button class="btn btn-outline" onclick="window.print()">🖨 طباعة الكشف</button>
+  </div>
+
+  <!-- رأس الكشف -->
+  <div class="stmt-header" id="stmt-header">
+    <div class="stmt-info">
+      <h2 id="sup-name">—</h2>
+      <div class="text-muted" style="font-size:13px" id="sup-details">—</div>
+    </div>
+    <div class="balance-badge" id="balance-badge">
+      <div class="lbl">الرصيد المستحق</div>
+      <div class="val" id="balance-val">—</div>
+    </div>
+  </div>
+
+  <!-- فلتر التاريخ -->
+  <div class="card no-print" style="margin-bottom:20px;display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap">
+    <div class="field" style="margin:0">
+      <label class="label">من تاريخ</label>
+      <input class="input" id="f-from" type="date" style="height:36px">
+    </div>
+    <div class="field" style="margin:0">
+      <label class="label">إلى تاريخ</label>
+      <input class="input" id="f-to" type="date" style="height:36px">
+    </div>
+    <button class="btn btn-outline" onclick="applyFilter()">تطبيق</button>
+    <button class="btn btn-outline" onclick="clearFilter()">إلغاء الفلتر</button>
+  </div>
+
+  <!-- جدول الكشف -->
+  <div class="card">
+    <h2 style="margin-bottom:16px">حركات الحساب</h2>
+    <div class="table-wrap">
+      <table class="table">
+        <thead>
+          <tr>
+            <th>التاريخ</th>
+            <th>البيان</th>
+            <th>مدين (علينا)</th>
+            <th>دائن (دفعنا)</th>
+            <th>الرصيد</th>
+          </tr>
+        </thead>
+        <tbody id="stmt-body"></tbody>
+      </table>
+    </div>
+    <div class="empty-state" id="stmt-empty" style="display:none">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/></svg>
+      لا توجد حركات لهذا المورد
+    </div>
+    <!-- سطر الإجمالي -->
+    <div id="stmt-total-row" style="display:none;margin-top:16px;padding:12px 16px;background:var(--bg2);border-radius:var(--radius-sm);display:flex;justify-content:space-between;align-items:center;font-weight:700">
+      <span>إجمالي الفترة</span>
+      <span>المدين: <span id="total-debit" class="text-red"></span> | الدائن: <span id="total-credit" class="text-green"></span> | الرصيد: <span id="total-balance"></span></span>
+    </div>
+  </div>
+</div>
+
+<script>
+renderLayout("suppliers");
+
+var _supId = null;
+var _allEntries = [];
+
+async function load() {
+  var params = new URLSearchParams(location.search);
+  _supId = Number(params.get("id"));
+  if (!_supId) { location.href = "suppliers.html"; return; }
+
+  var suppliers = await getSuppliers();
+  var sup = suppliers.find(function(s){return s.id===_supId;});
+  if (!sup) { location.href = "suppliers.html"; return; }
+
+  document.getElementById("sup-name").textContent    = sup.name;
+  document.getElementById("sup-sub").textContent     = sup.name;
+  document.getElementById("sup-details").innerHTML   =
+    (sup.phone ? '📞 '+esc(sup.phone)+'  ' : '') +
+    (sup.address ? '📍 '+esc(sup.address) : '');
+  document.getElementById("inv-link").href = "supplier-invoices.html?id=" + _supId;
+  document.title = "كشف حساب " + sup.name + " — WeB Ora";
+
+  var bb = document.getElementById("balance-badge");
+  var bv = document.getElementById("balance-val");
+  bv.textContent = formatPrice(sup.balance);
+  if (sup.balance > 0) bb.className = "balance-badge balance-pos";
+  else bb.className = "balance-badge balance-zero";
+
+  var stmt = await getSupplierStatement(_supId);
+  _allEntries = stmt.entries;
+  renderTable(_allEntries);
+}
+
+function renderTable(entries) {
+  var tbody = document.getElementById("stmt-body");
+  var empty = document.getElementById("stmt-empty");
+  var totalRow = document.getElementById("stmt-total-row");
+  if (!entries.length) { empty.style.display=""; tbody.innerHTML=""; totalRow.style.display="none"; return; }
+  empty.style.display = "none";
+  totalRow.style.display = "";
+
+  var totDebit = 0, totCredit = 0;
+  tbody.innerHTML = entries.map(function(e) {
+    totDebit  += e.debit;
+    totCredit += e.credit;
+    var debitHtml  = e.debit  > 0 ? '<span class="entry-debit fw-bold">'+formatPrice(e.debit)+'</span>'  : '—';
+    var creditHtml = e.credit > 0 ? '<span class="entry-credit fw-bold">'+formatPrice(e.credit)+'</span>' : '—';
+    var balClass   = e.balance > 0 ? 'text-red fw-bold' : e.balance < 0 ? 'text-green fw-bold' : 'text-muted';
+    return '<tr>'+
+      '<td class="text-muted direction-ltr" style="font-size:12px">'+fmtDate(e.date)+'</td>'+
+      '<td>'+(e.type==="invoice"?'📄 فاتورة: '+esc(e.ref||''):'💰 '+esc(e.ref||''))+(e.notes?' — '+esc(e.notes):'')+'</td>'+
+      '<td>'+debitHtml+'</td>'+
+      '<td>'+creditHtml+'</td>'+
+      '<td class="'+balClass+'">'+formatPrice(e.balance)+'</td>'+
+    '</tr>';
+  }).join("");
+
+  document.getElementById("total-debit").textContent  = formatPrice(totDebit);
+  document.getElementById("total-credit").textContent = formatPrice(totCredit);
+  var finalBal = totDebit - totCredit;
+  var tb = document.getElementById("total-balance");
+  tb.textContent = formatPrice(Math.abs(finalBal)) + (finalBal>0?' (مستحق)':' (زائد)');
+  tb.className   = finalBal > 0 ? 'text-red' : 'text-green';
+}
+
+function applyFilter() {
+  var from = document.getElementById("f-from").value;
+  var to   = document.getElementById("f-to").value;
+  var filtered = _allEntries.filter(function(e) {
+    if (from && e.date < from) return false;
+    if (to   && e.date > to)   return false;
+    return true;
+  });
+  renderTable(filtered);
+}
+
+function clearFilter() {
+  document.getElementById("f-from").value = "";
+  document.getElementById("f-to").value   = "";
+  renderTable(_allEntries);
+}
+
+load();
+</script>
+    <script src="js/auto-updater-ui.js"></script>
+</body>
+</html>

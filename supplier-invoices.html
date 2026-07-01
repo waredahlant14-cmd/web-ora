@@ -1,0 +1,321 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>فواتير المورد — WeB Ora</title>
+  <link rel="icon" type="image/png" href="img/mark-glow.png">
+  <link rel="stylesheet" href="css/style.css">
+  <script src="config.js"></script>
+  <script src="js/mode-manager.js"></script>
+  <script src="js/supabase.min.js"></script>
+  <script src="js/auth.js"></script>
+  <script src="js/seclog.js"></script>
+  <script src="js/currency.js"></script>
+  <script src="js/db.js"></script>
+  <script src="js/sync_queue.js"></script>
+  <script src="js/notifications.js"></script>
+  <script src="js/initial_sync.js"></script>
+  <script src="js/sync_replay.js"></script>
+    <script src="js/background_sync.js"></script>
+  <script src="js/queue.js"></script>
+  <script src="js/online.js"></script>
+  <script src="js/layout.js"></script>
+  <script src="js/nav-extend.js"></script>
+  <script src="js/suppliers.js"></script>
+  <style>
+    .items-table { width:100%;border-collapse:collapse;margin-top:8px }
+    .items-table th,.items-table td { padding:8px 10px;border:1px solid var(--border);font-size:13px }
+    .items-table th { background:var(--bg2);font-weight:700 }
+    .add-row-btn { background:none;border:1.5px dashed var(--border);width:100%;padding:10px;border-radius:var(--radius-sm);cursor:pointer;color:var(--primary);font-weight:600;font-size:13px;margin-top:8px;transition:.15s }
+    .add-row-btn:hover { background:var(--primary-light) }
+    .rm-row { background:none;border:none;cursor:pointer;color:var(--red);font-size:16px;padding:0 4px }
+  </style>
+  <script src="js/refresh-btn.js"></script>
+</head>
+<body>
+<div id="page">
+  <div class="page-head">
+    <h1>فواتير المورد</h1>
+    <p id="sup-name-head" class="text-muted">جارٍ التحميل...</p>
+  </div>
+
+  <div style="display:flex;gap:10px;margin-bottom:20px;flex-wrap:wrap" id="sup-actions">
+    <a class="btn btn-outline" href="suppliers.html">← الموردون</a>
+    <a class="btn btn-outline" id="stmt-link" href="#">كشف الحساب</a>
+    <button class="btn btn-primary" onclick="openAddModal()">+ فاتورة شراء جديدة</button>
+  </div>
+
+  <!-- إحصائيات -->
+  <div class="stats-grid" id="inv-stats" style="margin-bottom:20px;display:none"></div>
+
+  <div class="card">
+    <h2 style="margin-bottom:16px">الفواتير</h2>
+    <div class="table-wrap">
+      <table class="table">
+        <thead>
+          <tr>
+            <th>رقم الفاتورة</th>
+            <th>التاريخ</th>
+            <th>الإجمالي</th>
+            <th>المدفوع</th>
+            <th>المتبقي</th>
+            <th>الحالة</th>
+            <th>إجراءات</th>
+          </tr>
+        </thead>
+        <tbody id="inv-body"></tbody>
+      </table>
+    </div>
+    <div class="empty-state" id="inv-empty" style="display:none">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/></svg>
+      لا توجد فواتير لهذا المورد بعد
+    </div>
+  </div>
+</div>
+
+<!-- Modal فاتورة جديدة -->
+<div class="modal" id="inv-modal">
+  <div class="modal-box" style="max-width:640px">
+    <div class="modal-head">
+      <h3>فاتورة شراء جديدة</h3>
+      <button class="modal-close" onclick="closeModal('inv-modal')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+        <div class="field"><label class="label">تاريخ الفاتورة</label>
+          <input class="input" id="f-date" type="date"></div>
+        <div class="field"><label class="label">المبلغ المدفوع الآن</label>
+          <input class="input" id="f-paid" type="number" min="0" step="0.01" placeholder="0.00"></div>
+      </div>
+      <div class="field"><label class="label">ملاحظات</label>
+        <input class="input" id="f-notes" placeholder="اختياري"></div>
+
+      <h4 style="margin:16px 0 8px;font-size:14px">بنود الفاتورة</h4>
+      <table class="items-table">
+        <thead>
+          <tr><th>المنتج / الوصف</th><th style="width:90px">الكمية</th><th style="width:110px">السعر</th><th style="width:100px">الإجمالي</th><th style="width:36px"></th></tr>
+        </thead>
+        <tbody id="items-body"></tbody>
+      </table>
+      <button class="add-row-btn" onclick="addItemRow()">+ إضافة صنف</button>
+
+      <div style="text-align:left;margin-top:12px;font-size:16px;font-weight:700">
+        الإجمالي: <span id="total-val" style="color:var(--primary)">0.00</span>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-outline" onclick="closeModal('inv-modal')">إلغاء</button>
+      <button class="btn btn-primary" onclick="saveInvoice()">حفظ الفاتورة</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal دفعة -->
+<div class="modal" id="pay-modal">
+  <div class="modal-box" style="max-width:360px">
+    <div class="modal-head">
+      <h3>تسجيل دفعة</h3>
+      <button class="modal-close" onclick="closeModal('pay-modal')">✕</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="pay-inv-id">
+      <p class="text-muted" style="font-size:13px;margin-bottom:12px">
+        المتبقي: <strong id="pay-remain"></strong>
+      </p>
+      <div class="field"><label class="label">المبلغ</label>
+        <input class="input" id="pay-amount" type="number" min="0.01" step="0.01" placeholder="0.00"></div>
+      <div class="field"><label class="label">التاريخ</label>
+        <input class="input" id="pay-date" type="date"></div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-outline" onclick="closeModal('pay-modal')">إلغاء</button>
+      <button class="btn btn-primary" onclick="confirmPay()">تأكيد</button>
+    </div>
+  </div>
+</div>
+
+<script>
+renderLayout("suppliers");
+
+var _supId = null;
+var _supplier = null;
+var _invoices = [];
+var _products = [];
+var _rowCount = 0;
+
+async function load() {
+  var params = new URLSearchParams(location.search);
+  _supId = Number(params.get("id"));
+  if (!_supId) { location.href="suppliers.html"; return; }
+
+  var suppliers = await getSuppliers();
+  _supplier = suppliers.find(function(s){return s.id===_supId;});
+  if (!_supplier) { location.href="suppliers.html"; return; }
+
+  document.getElementById("sup-name-head").textContent = _supplier.name;
+  document.getElementById("stmt-link").href = "supplier-statement.html?id=" + _supId;
+  document.title = "فواتير " + _supplier.name + " — WeB Ora";
+
+  _invoices = await getSupplierInvoices(_supId);
+  _products = await getProducts();
+  renderStats();
+  renderTable();
+}
+
+function renderStats() {
+  var totalInv = _invoices.reduce(function(a,v){return a+v.total;},0);
+  var totalPaid = _invoices.reduce(function(a,v){return a+v.paid;},0);
+  var totalLeft = totalInv - totalPaid;
+  var statsEl = document.getElementById("inv-stats");
+  if (!_invoices.length) { statsEl.style.display="none"; return; }
+  statsEl.style.display = "";
+  statsEl.innerHTML =
+    '<div class="stat-card blue"><div class="label">عدد الفواتير</div><div class="value">'+_invoices.length+'</div></div>'+
+    '<div class="stat-card orange"><div class="label">إجمالي المشتريات</div><div class="value">'+formatPrice(totalInv)+'</div></div>'+
+    '<div class="stat-card green"><div class="label">إجمالي المدفوع</div><div class="value">'+formatPrice(totalPaid)+'</div></div>'+
+    '<div class="stat-card red"><div class="label">إجمالي المتبقي</div><div class="value">'+formatPrice(totalLeft)+'</div></div>';
+}
+
+function renderTable() {
+  var tbody = document.getElementById("inv-body");
+  var empty = document.getElementById("inv-empty");
+  if (!_invoices.length) { empty.style.display=""; tbody.innerHTML=""; return; }
+  empty.style.display = "none";
+  tbody.innerHTML = _invoices.map(function(inv) {
+    var remain = inv.total - inv.paid;
+    var stClass = inv.status==="paid"?"badge-green":inv.status==="partial"?"badge-yellow":"badge-red";
+    var stLabel = inv.status==="paid"?"مدفوعة":inv.status==="partial"?"جزئي":"غير مدفوعة";
+    return '<tr>'+
+      '<td class="fw-bold direction-ltr">'+esc(inv.invoiceNumber)+'</td>'+
+      '<td class="text-muted">'+fmtDate(inv.date)+'</td>'+
+      '<td class="fw-bold">'+formatPrice(inv.total)+'</td>'+
+      '<td class="text-green">'+formatPrice(inv.paid)+'</td>'+
+      '<td class="'+(remain>0?'text-red fw-bold':'text-muted')+'">'+formatPrice(remain)+'</td>'+
+      '<td><span class="badge '+stClass+'">'+stLabel+'</span></td>'+
+      '<td style="display:flex;gap:6px">'+
+        (remain>0?'<button class="btn btn-outline btn-sm" onclick="openPayModal('+inv.id+','+remain+')">دفعة</button>':'')+
+      '</td>'+
+    '</tr>';
+  }).join("");
+}
+
+function openAddModal() {
+  document.getElementById("f-date").value  = new Date().toISOString().slice(0,10);
+  document.getElementById("f-paid").value  = "";
+  document.getElementById("f-notes").value = "";
+  document.getElementById("items-body").innerHTML = "";
+  _rowCount = 0;
+  addItemRow(); addItemRow();
+  updateTotal();
+  openModal("inv-modal");
+}
+
+function addItemRow() {
+  var id = ++_rowCount;
+  var opts = _products.map(function(p){
+    return '<option value="'+p.id+'" data-price="'+p.price+'" data-name="'+esc(p.name)+'">'+esc(p.name)+'</option>';
+  }).join("");
+  var tr = document.createElement("tr");
+  tr.id = "row-"+id;
+  tr.innerHTML =
+    '<td><select class="input" style="padding:4px 8px;height:auto;font-size:12px" onchange="onProductSelect('+id+',this)">'+
+      '<option value="">-- صنف / وصف --</option>'+opts+
+    '</select>'+
+    '<input class="input" id="row-'+id+'-name" placeholder="أو اكتب..." style="margin-top:4px;padding:4px 8px;height:auto;font-size:12px"></td>'+
+    '<td><input class="input" id="row-'+id+'-qty" type="number" min="1" value="1" style="padding:4px 8px;height:auto;text-align:center" oninput="calcRow('+id+')"></td>'+
+    '<td><input class="input" id="row-'+id+'-price" type="number" min="0" step="0.01" value="0" style="padding:4px 8px;height:auto;text-align:center" oninput="calcRow('+id+')"></td>'+
+    '<td style="text-align:center;font-weight:700" id="row-'+id+'-total">0.00</td>'+
+    '<td><button class="rm-row" onclick="removeRow('+id+')">✕</button></td>';
+  document.getElementById("items-body").appendChild(tr);
+}
+
+function onProductSelect(id, sel) {
+  var opt = sel.options[sel.selectedIndex];
+  if (!opt.value) return;
+  document.getElementById("row-"+id+"-name").value  = opt.dataset.name||"";
+  document.getElementById("row-"+id+"-price").value = opt.dataset.price||0;
+  calcRow(id);
+}
+
+function calcRow(id) {
+  var qty   = parseFloat(document.getElementById("row-"+id+"-qty").value)  || 0;
+  var price = parseFloat(document.getElementById("row-"+id+"-price").value) || 0;
+  var tot   = qty * price;
+  document.getElementById("row-"+id+"-total").textContent = tot.toFixed(2);
+  updateTotal();
+}
+
+function removeRow(id) {
+  var el = document.getElementById("row-"+id);
+  if (el) el.remove();
+  updateTotal();
+}
+
+function updateTotal() {
+  var rows = document.querySelectorAll("#items-body tr");
+  var total = 0;
+  rows.forEach(function(tr) {
+    var id = tr.id.replace("row-","");
+    var qty   = parseFloat((document.getElementById("row-"+id+"-qty")||{}).value)||0;
+    var price = parseFloat((document.getElementById("row-"+id+"-price")||{}).value)||0;
+    total += qty * price;
+  });
+  document.getElementById("total-val").textContent = formatPrice(total);
+}
+
+async function saveInvoice() {
+  var items = [];
+  var rows  = document.querySelectorAll("#items-body tr");
+  var total = 0;
+  rows.forEach(function(tr) {
+    var id    = tr.id.replace("row-","");
+    var name  = (document.getElementById("row-"+id+"-name")||{}).value||"";
+    var qty   = parseFloat((document.getElementById("row-"+id+"-qty")||{}).value)||0;
+    var price = parseFloat((document.getElementById("row-"+id+"-price")||{}).value)||0;
+    if (!name || qty <= 0) return;
+    var tot = qty * price;
+    items.push({ name: name, quantity: qty, price: price, total: tot });
+    total += tot;
+  });
+  if (!items.length) { toast("يرجى إضافة بند واحد على الأقل","error"); return; }
+
+  var paid  = parseFloat(document.getElementById("f-paid").value)||0;
+  var date  = document.getElementById("f-date").value;
+  var notes = document.getElementById("f-notes").value.trim();
+
+  var res = await addSupplierInvoice({
+    supplierId: _supId, date: date,
+    total: total, paid: paid, notes: notes, items: items
+  });
+  if (!res) { toast("حدث خطأ أثناء الحفظ","error"); return; }
+  toast("تم حفظ الفاتورة","success");
+  closeModal("inv-modal");
+  _invoices = await getSupplierInvoices(_supId);
+  renderStats(); renderTable();
+}
+
+function openPayModal(invId, remain) {
+  document.getElementById("pay-inv-id").value = invId;
+  document.getElementById("pay-remain").textContent = formatPrice(remain);
+  document.getElementById("pay-amount").value = remain.toFixed(2);
+  document.getElementById("pay-date").value = new Date().toISOString().slice(0,10);
+  openModal("pay-modal");
+}
+
+async function confirmPay() {
+  var amount = parseFloat(document.getElementById("pay-amount").value);
+  if (!amount || amount <= 0) { toast("يرجى إدخال مبلغ صحيح","error"); return; }
+  var date = document.getElementById("pay-date").value;
+  await addSupplierPayment(_supId, amount, date, "دفعة لفاتورة");
+  toast("تم تسجيل الدفعة","success");
+  closeModal("pay-modal");
+  _invoices = await getSupplierInvoices(_supId);
+  renderStats(); renderTable();
+}
+
+load();
+</script>
+    <script src="js/auto-updater-ui.js"></script>
+</body>
+</html>

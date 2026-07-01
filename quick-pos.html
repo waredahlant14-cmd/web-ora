@@ -1,0 +1,1078 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>نقطة البيع السريع — WeB Ora</title>
+  <link rel="icon" type="image/png" href="img/mark-glow.png">
+  <link rel="stylesheet" href="css/style.css">
+  <script src="config.js"></script>
+  <script src="js/mode-manager.js"></script>
+  <script src="js/supabase.min.js"></script>
+  <script src="js/auth.js"></script>
+  <script src="js/seclog.js"></script>
+  <script src="js/currency.js"></script>
+  <script src="js/db.js"></script>
+  <script src="js/sync_queue.js"></script>
+  <script src="js/notifications.js"></script>
+  <script src="js/initial_sync.js"></script>
+  <script src="js/sync_replay.js"></script>
+  <script src="js/background_sync.js"></script>
+  <script src="js/python_sync_bridge.js"></script>
+  <script src="js/queue.js"></script>
+  <script src="js/online.js"></script>
+  <script src="js/layout.js"></script>
+  <script src="js/nav-extend.js"></script>
+  <script src="js/print.js"></script>
+  <script src="js/jsbarcode.min.js"></script>
+  <script src="js/silent-print.js"></script>
+  <script src="js/refresh-btn.js"></script>
+  <style>
+    /* ===== تخطيط نقطة البيع السريع ===== */
+    .qpos-layout {
+      display: grid;
+      grid-template-columns: 1fr 360px;
+      gap: 14px;
+      height: calc(100vh - 130px);
+      min-height: 500px;
+    }
+    @media (max-width: 900px) {
+      .qpos-layout { grid-template-columns: 1fr; height: auto; }
+      .qpos-cart-panel { order: -1; }
+    }
+
+    /* ===== لوحة المنتجات ===== */
+    .qpos-products-panel {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      overflow: hidden;
+    }
+
+    /* شريط البحث والفلتر */
+    .qpos-search-bar {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    .qpos-search-bar .barcode-wrap {
+      position: relative;
+      flex: 1;
+      min-width: 180px;
+    }
+    .qpos-search-bar .barcode-wrap input {
+      padding-inline-end: 40px;
+      font-family: monospace;
+      direction: ltr;
+      text-align: right;
+    }
+    .qpos-search-bar .barcode-icon {
+      position: absolute;
+      inset-inline-end: 10px;
+      top: 50%;
+      transform: translateY(-50%);
+      color: var(--text-muted);
+      pointer-events: none;
+    }
+    .qpos-search-bar select { max-width: 160px; min-width: 120px; }
+
+    /* شبكة التصنيفات */
+    .qpos-cats {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+    .qpos-cat-btn {
+      padding: 5px 14px;
+      border-radius: 20px;
+      border: 1.5px solid var(--border);
+      background: var(--card);
+      font-size: 12.5px;
+      font-weight: 700;
+      color: var(--text-muted);
+      cursor: pointer;
+      transition: all .15s;
+      white-space: nowrap;
+    }
+    .qpos-cat-btn:hover { border-color: var(--primary); color: var(--primary); }
+    .qpos-cat-btn.active { background: var(--primary); color: #fff; border-color: var(--primary); }
+
+    /* شبكة المنتجات */
+    .qpos-grid-wrap {
+      flex: 1;
+      overflow-y: auto;
+      scrollbar-width: thin;
+    }
+    .qpos-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+      gap: 10px;
+      padding-bottom: 8px;
+    }
+    .qpos-product-card {
+      background: var(--card);
+      border: 2px solid var(--border);
+      border-radius: var(--radius);
+      padding: 14px 10px 12px;
+      cursor: pointer;
+      text-align: center;
+      transition: all .15s;
+      position: relative;
+      user-select: none;
+    }
+    .qpos-product-card:hover {
+      border-color: var(--primary);
+      transform: translateY(-2px);
+      box-shadow: var(--shadow-md);
+    }
+    .qpos-product-card:active { transform: scale(.97); }
+    .qpos-product-card.out-of-stock {
+      opacity: .45;
+      cursor: not-allowed;
+    }
+    .qpos-product-card.out-of-stock:hover { transform: none; box-shadow: none; border-color: var(--border); }
+    .qpos-product-card .pc-icon {
+      width: 42px; height: 42px;
+      border-radius: 10px;
+      background: var(--primary-light);
+      display: flex; align-items: center; justify-content: center;
+      margin: 0 auto 8px;
+      color: var(--primary);
+    }
+    .qpos-product-card .pc-name {
+      font-size: 12.5px;
+      font-weight: 700;
+      color: var(--text);
+      margin-bottom: 4px;
+      line-height: 1.3;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+    .qpos-product-card .pc-price {
+      font-size: 13px;
+      font-weight: 800;
+      color: var(--primary);
+    }
+    .qpos-product-card .pc-stock {
+      font-size: 10.5px;
+      color: var(--text-muted);
+      margin-top: 3px;
+    }
+    .qpos-product-card .pc-add-badge {
+      position: absolute;
+      top: 6px;
+      left: 6px;
+      background: var(--green);
+      color: #fff;
+      border-radius: 50%;
+      width: 20px; height: 20px;
+      display: none;
+      align-items: center; justify-content: center;
+      font-size: 11px; font-weight: 800;
+    }
+    .qpos-product-card:hover .pc-add-badge { display: flex; }
+
+    .qpos-empty {
+      text-align: center;
+      padding: 40px 20px;
+      color: var(--text-muted);
+    }
+    .qpos-empty svg { width: 48px; height: 48px; opacity: .3; margin: 0 auto 12px; display: block; }
+
+    /* ===== لوحة السلة ===== */
+    .qpos-cart-panel {
+      display: flex;
+      flex-direction: column;
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      overflow: hidden;
+    }
+    .qpos-cart-head {
+      padding: 14px 16px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: var(--card2);
+    }
+    .qpos-cart-head h3 {
+      font-size: 14px;
+      font-weight: 800;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .cart-count-badge {
+      background: var(--primary);
+      color: #fff;
+      border-radius: 12px;
+      padding: 1px 8px;
+      font-size: 11px;
+      font-weight: 800;
+    }
+
+    /* قائمة عناصر السلة */
+    .qpos-cart-items {
+      flex: 1;
+      overflow-y: auto;
+      scrollbar-width: thin;
+      padding: 8px;
+    }
+    .qpos-cart-empty {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100%;
+      min-height: 120px;
+      color: var(--text-muted);
+      font-size: 13px;
+      gap: 8px;
+    }
+    .qpos-cart-empty svg { width: 40px; height: 40px; opacity: .25; }
+
+    .qpos-cart-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px;
+      border-radius: var(--radius-sm);
+      margin-bottom: 4px;
+      background: var(--bg);
+      transition: background .12s;
+    }
+    .qpos-cart-item:hover { background: var(--bg2); }
+    .qpos-cart-item .ci-name {
+      flex: 1;
+      font-size: 12.5px;
+      font-weight: 700;
+      color: var(--text);
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .qpos-cart-item .ci-price {
+      font-size: 11px;
+      color: var(--text-muted);
+      display: block;
+      font-weight: 600;
+    }
+    .ci-qty-ctrl {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .ci-qty-ctrl button {
+      width: 24px; height: 24px;
+      border-radius: 6px;
+      background: var(--card);
+      border: 1px solid var(--border);
+      font-size: 14px; font-weight: 800;
+      color: var(--text);
+      cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      transition: background .12s;
+    }
+    .ci-qty-ctrl button:hover { background: var(--primary-light); color: var(--primary); }
+    .ci-qty-ctrl .qty-num {
+      font-size: 13px;
+      font-weight: 800;
+      min-width: 20px;
+      text-align: center;
+    }
+    .qpos-cart-item .ci-total {
+      font-size: 13px;
+      font-weight: 800;
+      color: var(--primary);
+      min-width: 55px;
+      text-align: left;
+    }
+    .ci-del-btn {
+      width: 22px; height: 22px;
+      border-radius: 50%;
+      background: transparent;
+      border: none;
+      color: var(--text-muted);
+      cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      opacity: .5;
+      transition: all .12s;
+    }
+    .ci-del-btn:hover { background: var(--red-light); color: var(--red); opacity: 1; }
+
+    /* ===== ملخص الإجمالي ===== */
+    .qpos-summary {
+      padding: 12px 16px;
+      border-top: 1px solid var(--border);
+      background: var(--card2);
+    }
+    .qpos-summary-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 12.5px;
+      color: var(--text-muted);
+      margin-bottom: 5px;
+    }
+    .qpos-summary-row.total {
+      font-size: 18px;
+      font-weight: 800;
+      color: var(--text);
+      border-top: 1.5px solid var(--border);
+      padding-top: 8px;
+      margin-top: 6px;
+      margin-bottom: 0;
+    }
+    .qpos-summary-row.total .total-val { color: var(--green); }
+
+    /* خصم سريع */
+    .qpos-discount-row {
+      display: flex;
+      gap: 6px;
+      margin: 8px 0;
+      align-items: center;
+    }
+    .qpos-discount-row label {
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--text-muted);
+      white-space: nowrap;
+    }
+    .qpos-discount-row input {
+      width: 70px;
+      padding: 5px 8px;
+      border: 1.5px solid var(--border);
+      border-radius: var(--radius-sm);
+      font-size: 13px;
+      font-weight: 700;
+      text-align: center;
+      background: var(--input-bg);
+      color: var(--text);
+    }
+    .qpos-discount-row input:focus { border-color: var(--primary); outline: none; }
+    .qpos-discount-row select {
+      flex: 1;
+      padding: 5px 8px;
+      border: 1.5px solid var(--border);
+      border-radius: var(--radius-sm);
+      font-size: 12px;
+      background: var(--input-bg);
+      color: var(--text);
+    }
+
+    /* ===== أزرار الدفع ===== */
+    .qpos-pay-btns {
+      padding: 12px 16px 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      border-top: 1px solid var(--border);
+    }
+    .qpos-pay-row { display: flex; gap: 8px; }
+    .qpos-pay-btn {
+      flex: 1;
+      padding: 12px 8px;
+      border-radius: var(--radius-sm);
+      border: none;
+      font-size: 13px;
+      font-weight: 800;
+      cursor: pointer;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+      transition: all .15s;
+    }
+    .qpos-pay-btn svg { width: 18px; height: 18px; }
+    .qpos-pay-btn:hover { transform: translateY(-1px); box-shadow: var(--shadow-md); }
+    .qpos-pay-btn:active { transform: scale(.98); }
+    .qpos-pay-btn:disabled { opacity: .4; cursor: not-allowed; transform: none !important; box-shadow: none !important; }
+    .btn-cash  { background: var(--green);  color: #fff; }
+    .btn-debit { background: var(--primary); color: #fff; }
+    .btn-later { background: var(--yellow-light); color: var(--yellow); }
+    .qpos-clear-btn {
+      width: 100%;
+      padding: 8px;
+      background: var(--red-light);
+      color: var(--red);
+      border: none;
+      border-radius: var(--radius-sm);
+      font-size: 12.5px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: background .12s;
+    }
+    .qpos-clear-btn:hover { background: rgba(220,38,38,.22); }
+
+    /* ===== نافذة الخيارات الإضافية ===== */
+    .qpos-options-panel {
+      padding: 10px 16px 0;
+      border-top: 1px solid var(--border);
+    }
+    .qpos-options-toggle {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--text-muted);
+      cursor: pointer;
+      padding: 4px 0;
+      user-select: none;
+    }
+    .qpos-options-toggle:hover { color: var(--primary); }
+    .qpos-options-body {
+      display: none;
+      padding: 10px 0 6px;
+    }
+    .qpos-options-body.open { display: block; }
+
+    /* ===== نافذة تأكيد البيع ===== */
+    .qpos-confirm-modal .modal {
+      max-width: 400px;
+    }
+    .confirm-amount {
+      font-size: 32px;
+      font-weight: 900;
+      color: var(--green);
+      text-align: center;
+      margin: 12px 0;
+      letter-spacing: -.02em;
+    }
+    .confirm-method {
+      text-align: center;
+      font-size: 13px;
+      color: var(--text-muted);
+      margin-bottom: 16px;
+    }
+    .confirm-items-list {
+      font-size: 12.5px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      overflow: hidden;
+      margin-bottom: 14px;
+    }
+    .confirm-items-list .cil-row {
+      display: flex;
+      justify-content: space-between;
+      padding: 7px 12px;
+      border-bottom: 1px solid var(--border);
+    }
+    .confirm-items-list .cil-row:last-child { border-bottom: none; }
+    .confirm-items-list .cil-row span:first-child { color: var(--text-muted); }
+    .confirm-items-list .cil-row span:last-child { font-weight: 700; }
+
+    /* تأثير نجاح البيع */
+    @keyframes sale-success {
+      0% { transform: scale(1); }
+      30% { transform: scale(1.05); }
+      60% { transform: scale(.98); }
+      100% { transform: scale(1); }
+    }
+    .sale-success-anim { animation: sale-success .4s ease; }
+
+    /* شريط الكمية عند الضغط المطوّل */
+    .qpos-product-card .pc-qty-badge {
+      position: absolute;
+      top: -6px;
+      right: -6px;
+      background: var(--primary);
+      color: #fff;
+      border-radius: 50%;
+      width: 22px; height: 22px;
+      font-size: 11px; font-weight: 800;
+      display: flex; align-items: center; justify-content: center;
+      box-shadow: 0 2px 4px rgba(0,0,0,.2);
+    }
+
+    /* مؤشر تحميل */
+    .qpos-loading {
+      text-align: center;
+      padding: 40px 20px;
+      color: var(--text-muted);
+      font-size: 13px;
+    }
+  </style>
+</head>
+<body>
+<div id="page">
+  <div class="page-head-row">
+    <div>
+      <h1>
+        <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2.5" style="display:inline-block;vertical-align:-4px;margin-left:6px"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg>
+        نقطة البيع السريع
+      </h1>
+      <p>اختر المنتجات واكمل عملية البيع بسرعة</p>
+    </div>
+    <a class="btn btn-outline btn-sm" href="new-invoice.html">
+      <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/></svg>
+      فاتورة تفصيلية
+    </a>
+  </div>
+
+  <div class="qpos-layout">
+
+    <!-- ===== لوحة المنتجات ===== -->
+    <div class="qpos-products-panel">
+
+      <!-- شريط البحث والباركود -->
+      <div class="qpos-search-bar">
+        <div class="barcode-wrap">
+          <input class="input" id="qpos-barcode" placeholder="باركود أو اسم المنتج…" autocomplete="off">
+          <span class="barcode-icon">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 7V5a2 2 0 0 1 2-2h2"/><path d="M17 3h2a2 2 0 0 1 2 2v2"/><path d="M21 17v2a2 2 0 0 1-2 2h-2"/><path d="M7 21H5a2 2 0 0 1-2-2v-2"/><line x1="7" y1="12" x2="17" y2="12"/></svg>
+          </span>
+        </div>
+      </div>
+
+      <!-- أزرار التصنيفات -->
+      <div class="qpos-cats" id="qpos-cats"></div>
+
+      <!-- شبكة المنتجات -->
+      <div class="qpos-grid-wrap">
+        <div class="qpos-grid" id="qpos-grid">
+          <div class="qpos-loading">جاري تحميل المنتجات…</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== لوحة السلة ===== -->
+    <div class="qpos-cart-panel">
+
+      <!-- رأس السلة -->
+      <div class="qpos-cart-head">
+        <h3>
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg>
+          السلة
+          <span class="cart-count-badge" id="cart-count">0</span>
+        </h3>
+        <span id="qpos-time" style="font-size:11px;color:var(--text-muted)"></span>
+      </div>
+
+      <!-- عناصر السلة -->
+      <div class="qpos-cart-items" id="qpos-cart-items">
+        <div class="qpos-cart-empty" id="qpos-cart-empty">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg>
+          السلة فارغة — اختر منتجاً
+        </div>
+        <div id="qpos-cart-list"></div>
+      </div>
+
+      <!-- الخيارات الإضافية (عميل، خصم) -->
+      <div class="qpos-options-panel">
+        <div class="qpos-options-toggle" onclick="toggleOptions()">
+          <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+          <span id="opts-toggle-lbl">خيارات إضافية (عميل، خصم)</span>
+        </div>
+        <div class="qpos-options-body" id="qpos-opts-body">
+          <div class="field" style="margin-bottom:8px">
+            <label style="font-size:12px">العميل (اختياري)</label>
+            <select class="input" id="qpos-customer" style="font-size:12.5px;padding:7px 10px">
+              <option value="">— زبون عام —</option>
+            </select>
+          </div>
+          <div class="qpos-discount-row">
+            <label>خصم:</label>
+            <input type="number" id="qpos-discount-val" value="0" min="0" oninput="renderSummary()">
+            <select id="qpos-discount-type" onchange="renderSummary()">
+              <option value="amount">مبلغ ثابت</option>
+              <option value="percent">نسبة %</option>
+            </select>
+          </div>
+          <div class="field" style="margin-bottom:0">
+            <label style="font-size:12px">ملاحظات</label>
+            <input class="input" id="qpos-notes" placeholder="ملاحظة سريعة…" style="padding:7px 10px;font-size:12.5px">
+          </div>
+        </div>
+      </div>
+
+      <!-- ملخص الإجمالي -->
+      <div class="qpos-summary">
+        <div class="qpos-summary-row">
+          <span>المجموع الفرعي</span>
+          <span id="sum-subtotal">0</span>
+        </div>
+        <div class="qpos-summary-row" id="sum-discount-row" style="display:none;color:var(--red)">
+          <span>الخصم</span>
+          <span id="sum-discount-val">0</span>
+        </div>
+        <div class="qpos-summary-row total">
+          <span>الإجمالي</span>
+          <span class="total-val" id="sum-total">0</span>
+        </div>
+      </div>
+
+      <!-- أزرار الدفع -->
+      <div class="qpos-pay-btns">
+        <div class="qpos-pay-row">
+          <button class="qpos-pay-btn btn-cash" id="btn-cash" onclick="completeSale('مدفوع','نقداً')" disabled>
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>
+            نقداً
+          </button>
+          <button class="qpos-pay-btn btn-debit" id="btn-debit" onclick="completeSale('مدفوع','شام كاش')" disabled>
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>
+            شام كاش
+          </button>
+          <button class="qpos-pay-btn btn-later" id="btn-later" onclick="completeSale('آجل','آجل')" disabled>
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+            آجل
+          </button>
+        </div>
+        <button class="qpos-clear-btn" onclick="clearCart()">
+          <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display:inline;vertical-align:-2px"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/></svg>
+          تفريغ السلة
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== نافذة تأكيد البيع ===== -->
+<div class="modal-overlay" id="confirm-modal">
+  <div class="modal" style="max-width:400px;position:relative">
+    <div class="modal-close" onclick="closeModal('confirm-modal')">✕</div>
+    <h3 style="margin-bottom:4px">
+      <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
+      تأكيد البيع
+    </h3>
+    <div class="confirm-amount" id="conf-amount">0</div>
+    <div class="confirm-method" id="conf-method"></div>
+    <div class="confirm-items-list" id="conf-items-list"></div>
+    <div class="modal-actions">
+      <button class="btn btn-primary" id="conf-save-btn" onclick="doSave(false)">
+        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/></svg>
+        حفظ
+      </button>
+      <button class="btn btn-green" onclick="doSave(true)">
+        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+        حفظ وطباعة
+      </button>
+      <button class="btn btn-outline" onclick="closeModal('confirm-modal')">إلغاء</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  renderLayout("quick-pos");
+
+  /* ─── حالة التطبيق ─── */
+  var ALL_PRODUCTS  = [];
+  var CART          = [];
+  var CUSTOMERS     = [];
+  var ACTIVE_CAT    = "";
+  var SEARCH_TERM   = "";
+  var PENDING_METHOD= "";
+  var PENDING_STATUS= "";
+
+  /* ─── الساعة ─── */
+  function updateClock() {
+    var el = document.getElementById("qpos-time");
+    if (el) el.textContent = new Date().toLocaleTimeString("ar", { hour:"2-digit", minute:"2-digit" });
+  }
+  updateClock();
+  setInterval(updateClock, 30000);
+
+  /* ─── تبديل الخيارات الإضافية ─── */
+  function toggleOptions() {
+    var body = document.getElementById("qpos-opts-body");
+    var lbl  = document.getElementById("opts-toggle-lbl");
+    var open = body.classList.toggle("open");
+    lbl.textContent = open ? "إخفاء الخيارات" : "خيارات إضافية (عميل، خصم)";
+  }
+
+  /* ─── تحميل البيانات ─── */
+  async function init() {
+    try { ALL_PRODUCTS = await getProducts(); } catch(e) { ALL_PRODUCTS = []; }
+    try { CUSTOMERS    = await getCustomers(); } catch(e) { CUSTOMERS = []; }
+
+    /* بناء قائمة العملاء */
+    var opts = '<option value="">— زبون عام —</option>';
+    CUSTOMERS.forEach(function(c) {
+      opts += '<option value="' + esc(c.phone) + '">' + esc(c.name || c.phone) + '</option>';
+    });
+    document.getElementById("qpos-customer").innerHTML = opts;
+
+    buildCategories();
+    renderGrid();
+  }
+
+  /* ─── بناء أزرار التصنيفات ─── */
+  function buildCategories() {
+    var cats = [];
+    ALL_PRODUCTS.forEach(function(p) {
+      var c = (p.category || "").trim();
+      if (c && cats.indexOf(c) === -1) cats.push(c);
+    });
+    cats.sort(function(a, b) { return a.localeCompare(b, "ar"); });
+
+    var catsEl = document.getElementById("qpos-cats");
+    catsEl.innerHTML = "";
+
+    function makeBtn(label, cat) {
+      var btn = document.createElement("button");
+      btn.className = "qpos-cat-btn" + (cat === ACTIVE_CAT ? " active" : "");
+      btn.textContent = label;
+      btn.onclick = function() { filterCat(cat, btn); };
+      catsEl.appendChild(btn);
+    }
+    makeBtn("الكل", "");
+    cats.forEach(function(c) { makeBtn(c, c); });
+  }
+
+  function filterCat(cat, btnEl) {
+    ACTIVE_CAT = cat;
+    document.querySelectorAll(".qpos-cat-btn").forEach(function(btn) {
+      btn.classList.remove("active");
+    });
+    if (btnEl) btnEl.classList.add("active");
+    renderGrid();
+  }
+
+  /* ─── بناء شبكة المنتجات ─── */
+  function getFilteredProducts() {
+    return ALL_PRODUCTS.filter(function(p) {
+      if (ACTIVE_CAT && (p.category || "").trim() !== ACTIVE_CAT) return false;
+      if (SEARCH_TERM) {
+        var nm = (p.name    || "").toLowerCase().indexOf(SEARCH_TERM) !== -1;
+        var bc = (p.barcode || "").toLowerCase().indexOf(SEARCH_TERM) !== -1;
+        if (!nm && !bc) return false;
+      }
+      return true;
+    });
+  }
+
+  /* stock: null = غير محدود، 0 أو أقل = نفد */
+  function isOutOfStock(p) {
+    return p.stock !== null && p.stock !== undefined && Number(p.stock) <= 0;
+  }
+
+  function stockLabel(p) {
+    if (p.stock === null || p.stock === undefined) return '<span style="color:var(--text-muted);font-size:10px">—</span>';
+    if (Number(p.stock) <= 0) return '<span style="color:var(--red)">نفد المخزون</span>';
+    return 'مخزون: ' + p.stock;
+  }
+
+  function renderGrid() {
+    var products = getFilteredProducts();
+    var grid = document.getElementById("qpos-grid");
+
+    if (!products.length) {
+      grid.innerHTML = '<div class="qpos-empty">' +
+        '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><line x1="16.5" y1="9.4" x2="7.5" y2="4.21"/><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>' +
+        '<div>لا توجد منتجات مطابقة</div></div>';
+      return;
+    }
+
+    /* نبني الشبكة عبر DOM مباشرةً لتجنب مشاكل HTML injection */
+    grid.innerHTML = "";
+    products.forEach(function(p) {
+      var cartItem = CART.find(function(ci) { return String(ci.productId) === String(p.id); });
+      var inCart   = cartItem ? cartItem.quantity : 0;
+      var outStock = isOutOfStock(p);
+
+      var card = document.createElement("div");
+      card.className = "qpos-product-card" + (outStock ? " out-of-stock" : "");
+      card.title = (p.name || "") + (outStock ? " — نفد المخزون" : "");
+      if (!outStock) {
+        card.onclick = (function(pid) {
+          return function() { addToCart(pid); };
+        })(String(p.id));
+      }
+
+      card.innerHTML =
+        (inCart > 0 ? '<div class="pc-qty-badge">' + inCart + '</div>' : '') +
+        '<div class="pc-icon">' +
+          '<svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="16.5" y1="9.4" x2="7.5" y2="4.21"/><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>' +
+        '</div>' +
+        '<div class="pc-add-badge">+</div>' +
+        '<div class="pc-name">' + esc(p.name || "") + '</div>' +
+        '<div class="pc-price">' + formatPrice(p.price || 0) + '</div>' +
+        '<div class="pc-stock">' + stockLabel(p) + '</div>';
+
+      grid.appendChild(card);
+    });
+  }
+
+  /* ─── إضافة للسلة ─── */
+  function addToCart(productId) {
+    var p = ALL_PRODUCTS.find(function(x) { return String(x.id) === String(productId); });
+    if (!p) return;
+
+    /* التحقق من المخزون فقط إذا كانت القيمة محددة وصفراً أو أقل */
+    if (isOutOfStock(p)) { toast("المنتج غير متوفر بالمخزون", "error"); return; }
+
+    /* منع الإضافة إذا تجاوز الكمية المتاحة (فقط إن كان المخزون محدداً) */
+    var existing = CART.find(function(ci) { return String(ci.productId) === String(p.id); });
+    if (existing && p.stock !== null && p.stock !== undefined && existing.quantity >= Number(p.stock)) {
+      toast("لا يمكن إضافة أكثر من المخزون المتاح (" + p.stock + ")", "error");
+      return;
+    }
+
+    if (existing) {
+      existing.quantity += 1;
+      existing.total = existing.quantity * existing.price;
+    } else {
+      CART.push({
+        productId: String(p.id),
+        name: p.name,
+        price: Number(p.price) || 0,
+        costPrice: Number(p.costPrice) || 0,
+        quantity: 1,
+        total: Number(p.price) || 0
+      });
+    }
+    renderCart();
+    renderGrid();
+    renderSummary();
+  }
+
+  /* ─── الإضافة بالباركود ─── */
+  function addByBarcode(code) {
+    if (!code) return;
+    var codeLow = code.toLowerCase().trim();
+    var p = ALL_PRODUCTS.find(function(x) {
+      var bc = (x.barcode || "").toLowerCase().trim();
+      return bc === codeLow || (x.name || "").toLowerCase().indexOf(codeLow) !== -1;
+    });
+    if (!p) {
+      /* بحث جزئي في الاسم */
+      SEARCH_TERM = codeLow;
+      renderGrid();
+      return;
+    }
+    addToCart(String(p.id));
+    document.getElementById("qpos-barcode").value = "";
+    toast("أُضيف: " + p.name, "success");
+    SEARCH_TERM = "";
+    renderGrid();
+  }
+
+  document.getElementById("qpos-barcode").addEventListener("keydown", function(e) {
+    if (e.key === "Enter") { e.preventDefault(); addByBarcode(this.value.trim()); }
+  });
+  document.getElementById("qpos-barcode").addEventListener("input", function() {
+    SEARCH_TERM = this.value.toLowerCase().trim();
+    renderGrid();
+  });
+
+  /* ─── تعديل الكمية ─── */
+  function changeQty(idx, delta) {
+    if (!CART[idx]) return;
+    var item = CART[idx];
+    var newQty = item.quantity + delta;
+    if (newQty < 1) return;
+    /* تحقق من حد المخزون عند الزيادة */
+    if (delta > 0) {
+      var p = ALL_PRODUCTS.find(function(x) { return String(x.id) === String(item.productId); });
+      if (p && p.stock !== null && p.stock !== undefined && newQty > Number(p.stock)) {
+        toast("لا يمكن تجاوز المخزون المتاح (" + p.stock + ")", "error");
+        return;
+      }
+    }
+    item.quantity = newQty;
+    item.total    = item.quantity * item.price;
+    renderCart();
+    renderGrid();
+    renderSummary();
+  }
+
+  function removeItem(idx) {
+    CART.splice(idx, 1);
+    renderCart();
+    renderGrid();
+    renderSummary();
+  }
+
+  function clearCart() {
+    CART = [];
+    renderCart();
+    renderGrid();
+    renderSummary();
+  }
+
+  /* ─── عرض السلة ─── */
+  function renderCart() {
+    var list    = document.getElementById("qpos-cart-list");
+    var empty   = document.getElementById("qpos-cart-empty");
+    var countEl = document.getElementById("cart-count");
+    var totalItems = CART.reduce(function(a, ci) { return a + ci.quantity; }, 0);
+    countEl.textContent = totalItems;
+
+    if (!CART.length) {
+      list.innerHTML = "";
+      empty.style.display = "flex";
+      ["btn-cash","btn-debit","btn-later"].forEach(function(id) {
+        document.getElementById(id).disabled = true;
+      });
+      return;
+    }
+
+    empty.style.display = "none";
+    var html = "";
+    CART.forEach(function(ci, idx) {
+      html +=
+        '<div class="qpos-cart-item">' +
+          '<div style="flex:1;min-width:0">' +
+            '<div class="ci-name">' + esc(ci.name) + '</div>' +
+            '<span class="ci-price">' + formatPrice(ci.price) + ' × وحدة</span>' +
+          '</div>' +
+          '<div class="ci-qty-ctrl">' +
+            '<button onclick="changeQty(' + idx + ',-1)">−</button>' +
+            '<span class="qty-num">' + ci.quantity + '</span>' +
+            '<button onclick="changeQty(' + idx + ',1)">+</button>' +
+          '</div>' +
+          '<div class="ci-total">' + formatPrice(ci.total) + '</div>' +
+          '<button class="ci-del-btn" onclick="removeItem(' + idx + ')" title="حذف">' +
+            '<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>' +
+          '</button>' +
+        '</div>';
+    });
+    list.innerHTML = html;
+
+    ["btn-cash","btn-debit","btn-later"].forEach(function(id) {
+      document.getElementById(id).disabled = false;
+    });
+  }
+
+  /* ─── حساب الإجمالي مع الخصم ─── */
+  function getDiscount(subtotal) {
+    var val  = parseFloat(document.getElementById("qpos-discount-val").value) || 0;
+    var type = document.getElementById("qpos-discount-type").value;
+    if (val <= 0) return 0;
+    if (type === "percent") return Math.min(subtotal, subtotal * val / 100);
+    return Math.min(subtotal, val);
+  }
+
+  function renderSummary() {
+    var subtotal  = CART.reduce(function(a, ci) { return a + ci.total; }, 0);
+    var discount  = getDiscount(subtotal);
+    var total     = Math.max(0, subtotal - discount);
+
+    document.getElementById("sum-subtotal").textContent = formatPrice(subtotal);
+    document.getElementById("sum-total").textContent    = formatPrice(total);
+
+    var discRow = document.getElementById("sum-discount-row");
+    var discVal = document.getElementById("sum-discount-val");
+    if (discount > 0) {
+      discRow.style.display = "flex";
+      discVal.textContent   = "- " + formatPrice(discount);
+    } else {
+      discRow.style.display = "none";
+    }
+  }
+
+  /* ─── إتمام البيع ─── */
+  function completeSale(status, method) {
+    if (!CART.length) { toast("السلة فارغة", "error"); return; }
+    PENDING_STATUS = status;
+    PENDING_METHOD = method;
+
+    var subtotal = CART.reduce(function(a, ci) { return a + ci.total; }, 0);
+    var discount = getDiscount(subtotal);
+    var total    = Math.max(0, subtotal - discount);
+
+    document.getElementById("conf-amount").textContent = formatPrice(total);
+    document.getElementById("conf-method").textContent = "طريقة الدفع: " + method +
+      (discount > 0 ? " | خصم: " + formatPrice(discount) : "");
+
+    var listHtml = "";
+    CART.forEach(function(ci) {
+      listHtml +=
+        '<div class="cil-row">' +
+          '<span>' + esc(ci.name) + ' × ' + ci.quantity + '</span>' +
+          '<span>' + formatPrice(ci.total) + '</span>' +
+        '</div>';
+    });
+    document.getElementById("conf-items-list").innerHTML = listHtml;
+    openModal("confirm-modal");
+  }
+
+  /* ─── حفظ البيع ─── */
+  async function doSave(withPrint) {
+    var btn = document.getElementById("conf-save-btn");
+    btn.disabled = true;
+    btn.textContent = "جاري الحفظ…";
+
+    var subtotal = CART.reduce(function(a, ci) { return a + ci.total; }, 0);
+    var discount = getDiscount(subtotal);
+    var total    = Math.max(0, subtotal - discount);
+
+    var custPhone = document.getElementById("qpos-customer").value;
+    var custObj   = null;
+    if (custPhone) {
+      var found = CUSTOMERS.find(function(c) { return c.phone === custPhone; });
+      custObj = found ? { phone: found.phone, name: found.name || "", address: found.address || "" } : null;
+    }
+
+    var invNum = await generateInvoiceNumber();
+    var notesParts = [];
+    var userNotes = (document.getElementById("qpos-notes").value || "").trim();
+    if (userNotes) notesParts.push(userNotes);
+    if (PENDING_METHOD && PENDING_METHOD !== PENDING_STATUS) notesParts.push("الدفع: " + PENDING_METHOD);
+    if (discount > 0) notesParts.push("خصم: " + formatPrice(discount));
+
+    var invoice = {
+      invoiceNumber: invNum,
+      date: new Date().toISOString().slice(0, 10),
+      paymentStatus: PENDING_STATUS,
+      total: total,
+      notes: notesParts.join(" | "),
+      customer: custObj,
+      items: CART.map(function(ci) {
+        return {
+          productId: ci.productId,
+          name: ci.name,
+          price: ci.price,
+          costPrice: ci.costPrice || 0,
+          quantity: ci.quantity,
+          total: ci.total
+        };
+      })
+    };
+
+    try {
+      await addInvoice(invoice);
+
+      if (withPrint && typeof printInvoice === "function") {
+        setTimeout(function() { printInvoice(invoice); }, 300);
+      }
+
+      toast("✓ تم حفظ الفاتورة " + invNum, "success");
+      closeModal("confirm-modal");
+
+      /* تفريغ السلة بعد البيع */
+      CART = [];
+      document.getElementById("qpos-discount-val").value = "0";
+      document.getElementById("qpos-notes").value = "";
+      document.getElementById("qpos-customer").value = "";
+      renderCart();
+      renderGrid();
+      renderSummary();
+
+      /* تحديث المنتجات لتعكس المخزون الجديد */
+      setTimeout(async function() {
+        ALL_PRODUCTS = await getProducts();
+        renderGrid();
+      }, 500);
+
+    } catch (e) {
+      toast("حدث خطأ أثناء الحفظ", "error");
+    }
+
+    btn.disabled = false;
+    btn.innerHTML =
+      '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/></svg> حفظ';
+  }
+
+  /* ─── تشغيل ─── */
+  init();
+  renderSummary();
+</script>
+  <script src="js/auto-updater-ui.js"></script>
+</body>
+</html>
