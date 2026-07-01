@@ -1,7 +1,7 @@
 {
     "appId":  "com.webora.pos",
     "appName":  "WeB Ora POS",
-    "webDir": "2-Android-APK-Build",
+    "webDir": "www",
     "server":  {
                    "androidScheme":  "https",
                    "allowNavigation":  [
