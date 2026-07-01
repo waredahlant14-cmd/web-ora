@@ -1,17 +1,14 @@
 {
   "appId": "com.webora.pos",
   "appName": "WeB Ora POS",
-  "webDir": ".",
+  "webDir": "www",
   "server": {
     "androidScheme": "https",
     "allowNavigation": ["*.supabase.co", "*.googleapis.com"]
   },
   "android": {
     "allowMixedContent": true,
-    "captureInput": true,
-    "webContentsDebuggingEnabled": false,
-    "loggingBehavior": "none",
-    "minWebViewVersion": 60
+    "webContentsDebuggingEnabled": false
   },
   "plugins": {
     "SplashScreen": {
